@@ -1,4 +1,4 @@
-###Download from SQLite website###
+### Download from SQLite website ###
 
 * Extract the package
 
