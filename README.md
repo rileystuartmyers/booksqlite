@@ -10,5 +10,5 @@ drag and drop them into your project
 
     This compiles into the _sqlite3.o_ file.
 
-* Now, whenever you compile your cpp projcect, be sure to use the command
+* Now, whenever you compile your cpp project, be sure to use the command
     _g++ main.cpp sqlite3.o -o app_
