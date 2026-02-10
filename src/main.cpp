@@ -3,7 +3,15 @@
 #include <fstream>
 #include <vector>
 #include <memory>
+
 #include <sqlite3.h>
+
+#include <imgui.h>
+#include <imgui_impl_glfw.h>
+#include <imgui_impl_opengl3.h>
+
+#include <GLES2/gl2.h>
+#include <GLFW/glfw3.h>
 
 const char *TABLE_NAME = "BOOKS";
 const char *TABLE_PATH = "../db/books.db";
@@ -14,7 +22,6 @@ static std::vector<std::vector<std::string>> RowValues;
 
 const bool ENABLE_CLOSURE = true;
 static unsigned short print_title_flag = 0;
-static unsigned long id_counter = 1;
 
 using statement = std::unique_ptr<sqlite3_stmt, decltype(&sqlite3_finalize)>;
 
@@ -219,8 +226,92 @@ int ExecuteQuery(sqlite3* db, std::string query, bool closure = false) {
 
 }
 
+void file_iter_count(std::string path) {
+
+    int count;
+
+    std::ifstream iff(path);
+    iff >> count;
+    iff.close();
+
+    printf("{%d}_ \n\n", count);
+
+    std::ofstream ofs(path);
+    ofs << count + 1;
+    ofs.close();
+
+    return;
+
+}
 
 int main(int argc, char **argv) {
+
+    file_iter_count("iter.txt");
+
+    if (!glfwInit()) {
+        return 1;
+    }
+    
+    GLFWwindow* WINDOW = glfwCreateWindow((int)(1280), (int)(800), "Dear ImGui GLFW+OpenGL3 example", nullptr, nullptr);
+    if (WINDOW == nullptr) return 1;
+    glfwMakeContextCurrent(WINDOW);
+    glfwSwapInterval(1); // Enable vsync
+
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGuiIO& io = ImGui::GetIO();
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
+
+    ImGui_ImplGlfw_InitForOpenGL(WINDOW, true);          // Second param install_callback=true will install GLFW callbacks and chain to existing ones.
+    ImGui_ImplOpenGL3_Init();
+
+    ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
+
+    while (!glfwWindowShouldClose(WINDOW)) {
+
+        glfwPollEvents();
+        ImGui_ImplOpenGL3_NewFrame();
+        ImGui_ImplGlfw_NewFrame();
+        ImGui::NewFrame();
+        
+        {
+            static float f = 0.0f;
+            static int counter = 0;
+
+            ImGui::Begin("Hello, world!");                          // Create a window called "Hello, world!" and append into it.
+
+            ImGui::Text("This is some useful text.");               // Display some text (you can use a format strings too)
+
+            ImGui::SliderFloat("float", &f, 0.0f, 1.0f);            // Edit 1 float using a slider from 0.0f to 1.0f
+            ImGui::ColorEdit3("clear color", (float*)&clear_color); // Edit 3 floats representing a color
+
+            if (ImGui::Button("Button"))                            // Buttons return true when clicked (most widgets return true when edited/activated)
+                counter++;
+            ImGui::SameLine();
+            ImGui::Text("counter = %d", counter);
+
+            ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
+            ImGui::End();
+        }
+        //ImGui::ShowDemoWindow(); // Show demo window! :)
+        //ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
+        ImGui::Render();
+        int display_w, display_h;
+        glfwGetFramebufferSize(WINDOW, &display_w, &display_h);
+        glViewport(0, 0, display_w, display_h);
+        glClearColor(clear_color.x * clear_color.w, clear_color.y * clear_color.w, clear_color.z * clear_color.w, clear_color.w);
+        glClear(GL_COLOR_BUFFER_BIT);
+        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
+        glfwSwapBuffers(WINDOW);
+
+    }
+
+    ImGui_ImplOpenGL3_Shutdown();
+    ImGui_ImplGlfw_Shutdown();
+    ImGui::DestroyContext();
 
     sqlite3* db;
     int rc = sqlite3_open("../db/temp.db", &db);
@@ -229,7 +320,6 @@ int main(int argc, char **argv) {
         std::cerr << "Error initializing table... " << std::endl;
         return -1;
     }
-
 
     auto statement = create_statement(
         db,
