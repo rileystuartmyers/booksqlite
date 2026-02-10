@@ -246,7 +246,7 @@ void file_iter_count(std::string path) {
 
 int main(int argc, char **argv) {
 
-    file_iter_count("iter.txt");
+    file_iter_count("iter2.txt");
 
     if (!glfwInit()) {
         return 1;
