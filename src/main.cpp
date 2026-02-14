@@ -6,13 +6,14 @@
 
 #include <sqlite3.h>
 
-#include <imgui.h>
-#include <imgui_impl_glfw.h>
-#include <imgui_impl_opengl3.h>
+#include "../include/imgui/imgui.h"
+#include "../include/imgui/backends/imgui_impl_glfw.h"
+#include "../include/imgui/backends/imgui_impl_opengl3.h"
 
 #include <GLES2/gl2.h>
 #include <GLFW/glfw3.h>
 
+static bool window = true;
 const char *TABLE_NAME = "BOOKS";
 const char *TABLE_PATH = "../db/books.db";
 
@@ -267,6 +268,11 @@ int main(int argc, char **argv) {
     ImGui_ImplOpenGL3_Init();
 
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
+    ImGui::SetNextWindowSize(ImGui::GetIO().DisplaySize);
+    ImGui::SetNextWindowPos(ImVec2(0, 0));
+    
+    static int item_current2 = 0;
+    const char *items2[] = {"Never", "Gonna", "Give", "You", "Up"};
 
     while (!glfwWindowShouldClose(WINDOW)) {
 
@@ -276,22 +282,22 @@ int main(int argc, char **argv) {
         ImGui::NewFrame();
         
         {
-            static float f = 0.0f;
-            static int counter = 0;
+            if (ImGui::Begin("window_name", &window))
+            {
 
-            ImGui::Begin("Hello, world!");                          // Create a window called "Hello, world!" and append into it.
+                ImGui::SetCursorPos(ImVec2(52,87));
+                ImGui::PushItemWidth(200);
+                static int item_current2 = 0;
+                ImGui::ListBox("##", &item_current2, items2, IM_ARRAYSIZE(items2));
+                ImGui::PopItemWidth();
 
-            ImGui::Text("This is some useful text.");               // Display some text (you can use a format strings too)
+                ImGui::SetCursorPos(ImVec2(62.5,63.5));
+                ImGui::Text("Book List");
 
-            ImGui::SliderFloat("float", &f, 0.0f, 1.0f);            // Edit 1 float using a slider from 0.0f to 1.0f
-            ImGui::ColorEdit3("clear color", (float*)&clear_color); // Edit 3 floats representing a color
+                ImGui::SetCursorPos(ImVec2(198,183.5));
+                ImGui::Button("Select", ImVec2(50,19)); //remove size argument (ImVec2) to auto-resize
 
-            if (ImGui::Button("Button"))                            // Buttons return true when clicked (most widgets return true when edited/activated)
-                counter++;
-            ImGui::SameLine();
-            ImGui::Text("counter = %d", counter);
-
-            ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
+            }
             ImGui::End();
         }
         //ImGui::ShowDemoWindow(); // Show demo window! :)
