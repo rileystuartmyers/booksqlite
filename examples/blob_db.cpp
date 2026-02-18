@@ -119,58 +119,65 @@ int main(int argc, char** argv) {
         return -1;
     }
 
-    const char* sql = "INSERT INTO BOOKS (id, name, epub) VALUES (?, ?, ?)";
+    // inserting into table with epub file
+    {    
+        const char* sql = "INSERT INTO BOOKS (id, name, epub) VALUES (?, ?, ?)";
 
-    std::vector<unsigned char> epub = readFile(EPUB_PATH);
-    if (epub.empty()) {
-        std::cerr << "EPUB empty." << std::endl;
-        return -1;
+        std::vector<unsigned char> epub = readFile(EPUB_PATH);
+        if (epub.empty()) {
+            std::cerr << "EPUB empty." << std::endl;
+            return -1;
+        }
+
+        if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) {
+            std::cerr << "Prepare failed." << std::endl;
+            return -1;
+        }
+
+        sqlite3_bind_text(stmt, 2, "Ana Karenina", -1, SQLITE_STATIC);
+        sqlite3_bind_blob(stmt, 3, epub.data(), static_cast<int>(epub.size()), SQLITE_STATIC);
+
+
+        if (sqlite3_step(stmt) != SQLITE_DONE) {
+            std::cerr << "Insert failed." << std::endl;
+        } else {
+            std::cout << "Insert success!" << std::endl;
+        }
+
+        sqlite3_finalize(stmt);
+
     }
 
-    if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) {
-        std::cerr << "Prepare failed." << std::endl;
-        return -1;
-    }
+    // retrieving blob and writing to file
+    {
+        sqlite3_stmt* stmt2;
+        const char* sql2 = "SELECT epub FROM BOOKS WHERE id = 3";
 
-    sqlite3_bind_text(stmt, 2, "Ana Karenina", -1, SQLITE_STATIC);
-    sqlite3_bind_blob(stmt, 3, epub.data(), static_cast<int>(epub.size()), SQLITE_STATIC);
+        if (sqlite3_prepare_v2(db, sql2, -1, &stmt2, nullptr) != SQLITE_OK) {
+            std::cerr << "Prepare failed: " << sqlite3_errmsg(db) << "\n";
+            return 1;
+        }
 
+        if (sqlite3_step(stmt2) == SQLITE_ROW) {
+            const void* blob = sqlite3_column_blob(stmt2, 0);
+            int size = sqlite3_column_bytes(stmt2, 0);
 
-    if (sqlite3_step(stmt) != SQLITE_DONE) {
-        std::cerr << "Insert failed." << std::endl;
-    } else {
-        std::cout << "Insert success!" << std::endl;
-    }
+            std::ofstream out("Ana Karenina.epub", std::ios::binary);
+            out.write(static_cast<const char*>(blob), size);
+            out.close();
 
-    sqlite3_finalize(stmt);
+            std::cout << "EPUB downloaded successfully\n";
 
-    sqlite3_stmt* stmt2;
-    const char* sql2 = "SELECT epub FROM BOOKS WHERE id = 3";
-
-    if (sqlite3_prepare_v2(db, sql2, -1, &stmt2, nullptr) != SQLITE_OK) {
-        std::cerr << "Prepare failed: " << sqlite3_errmsg(db) << "\n";
-        return 1;
-    }
-
-    if (sqlite3_step(stmt2) == SQLITE_ROW) {
-        const void* blob = sqlite3_column_blob(stmt2, 0);
-        int size = sqlite3_column_bytes(stmt2, 0);
-
-        std::ofstream out("Ana Karenina.epub", std::ios::binary);
-        out.write(static_cast<const char*>(blob), size);
-        out.close();
-
-        std::cout << "EPUB downloaded successfully\n";
-
-    } else {
+        } else {
+            
+            std::cerr << "Book not found\n";
         
-        std::cerr << "Book not found\n";
-    
+        }
+
+        sqlite3_finalize(stmt2);
     }
 
-    sqlite3_finalize(stmt2);
     sqlite3_close(db);
-
     return 0;
 
 }

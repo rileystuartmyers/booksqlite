@@ -25,7 +25,12 @@ const bool ENABLE_CLOSURE = true;
 static unsigned short print_title_flag = 0;
 
 using statement = std::unique_ptr<sqlite3_stmt, decltype(&sqlite3_finalize)>;
-
+/*
+    auto statement = create_statement(
+        db,
+        "INSERT INTO BOOKS VALUES(@id, @name);"
+    );
+*/
 statement create_statement(sqlite3* db, std::string sql) {
 
     sqlite3_stmt* stmt = nullptr;
@@ -50,16 +55,7 @@ statement create_statement(sqlite3* db, std::string sql) {
 
 }
 
-void ColumnCallback(sqlite3_stmt* stmt) {
 
-    for (int i = 0; i < sqlite3_column_count(stmt); ++i) {
-
-        continue;
-    }
-
-    return;
-    
-}
 
 static int callback(void *NotUsed, int argc, char **argv, char **ColName) {
 
@@ -108,125 +104,6 @@ static int callback_vector(void *NotUsed, int argc, char **argv, char **ColName)
 
 }
 
-void PRAGMA_ENABLE_WAL(sqlite3* db) {
-    sqlite3_exec(db, "PRAGMA journal_mode = WAL", nullptr, nullptr, nullptr);
-    return;
-}
-
-void PRAGMA_DISABLE_WAL(sqlite3* db) {
-    sqlite3_exec(db, "PRAGMA journal_mode = DELETE", nullptr, nullptr, nullptr);
-    return;
-}
-
-void CLEAR_CALLBACK_VALUES() {
-
-    ColNames.clear();
-    RowValues.clear();
-    print_title_flag = 0;
-
-    return;
-
-}
-
-int ERROR_CHECK(int return_code, std::stringstream& ss) {
-
-    if (return_code != SQLITE_OK) {
-        std::cerr << "Error with statement: { " << ss.str() << " }.  RETURN CODE " << return_code << ".    ERR " << pErrorMessage << std::endl;
-        return -1;
-    }
-
-    return 0;
-
-}
-
-int ERROR_CHECK(int return_code, std::string query) {
-
-    if (return_code != SQLITE_OK) {
-        std::cerr << "Error with statement: { " << query << " }.  RETURN CODE " << return_code << ".    ERR " << pErrorMessage << std::endl;
-        return -1;
-    }
-
-    return 0;
-
-}
-
-int DropTable(sqlite3* db, const char* tableName = TABLE_NAME) {
-
-    std::stringstream query;
-    query << " DROP TABLE " << tableName << ";";
-
-    int return_code = sqlite3_exec(
-        db, 
-        query.str().c_str(),
-        callback,
-        nullptr,
-        &pErrorMessage
-    );
-
-    return ERROR_CHECK(return_code, query);
-
-}
-
-int ExecuteQuery(sqlite3* db, std::stringstream& query, bool closure = false) {
-
-    int return_code;
-
-    if (closure == true) {
-        
-        return_code = sqlite3_exec(
-            db,
-            query.str().c_str(),
-            callback_vector,
-            nullptr,
-            &pErrorMessage
-        );
-        
-    } else {
-
-        return_code = sqlite3_exec(
-            db,
-            query.str().c_str(),
-            callback,
-            nullptr,
-            &pErrorMessage
-        );
-
-    }
-
-    return ERROR_CHECK(return_code, query);
-
-}
-
-int ExecuteQuery(sqlite3* db, std::string query, bool closure = false) {
-
-    int return_code;
-
-    if (closure == true) {
-        
-        return_code = sqlite3_exec(
-            db,
-            query.c_str(),
-            callback_vector,
-            nullptr,
-            &pErrorMessage
-        );
-        
-    } else {
-
-        return_code = sqlite3_exec(
-            db,
-            query.c_str(),
-            callback,
-            nullptr,
-            &pErrorMessage
-        );
-
-    }
-
-    return ERROR_CHECK(return_code, query);
-
-}
-
 void file_iter_count(std::string path) {
 
     int count;
@@ -247,14 +124,13 @@ void file_iter_count(std::string path) {
 
 int main(int argc, char **argv) {
 
-    file_iter_count("iter2.txt");
-
     if (!glfwInit()) {
         return 1;
     }
     
-    GLFWwindow* WINDOW = glfwCreateWindow((int)(1280), (int)(800), "Dear ImGui GLFW+OpenGL3 example", nullptr, nullptr);
+    GLFWwindow* WINDOW = glfwCreateWindow((int)(1280), (int)(800), "BookDB", nullptr, nullptr);
     if (WINDOW == nullptr) return 1;
+
     glfwMakeContextCurrent(WINDOW);
     glfwSwapInterval(1); // Enable vsync
 
@@ -262,7 +138,6 @@ int main(int argc, char **argv) {
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO();
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
-    io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
 
     ImGui_ImplGlfw_InitForOpenGL(WINDOW, true);          // Second param install_callback=true will install GLFW callbacks and chain to existing ones.
     ImGui_ImplOpenGL3_Init();
@@ -271,8 +146,68 @@ int main(int argc, char **argv) {
     ImGui::SetNextWindowSize(ImGui::GetIO().DisplaySize);
     ImGui::SetNextWindowPos(ImVec2(0, 0));
     
+    // opening db
+    sqlite3* db;
+    int rc = sqlite3_open(
+        TABLE_PATH,
+        &db
+    );
+    if (rc != SQLITE_OK) {
+        std::cerr << "Error initializing/opening database." << std::endl;
+        return 1;
+    }
+
+    // statement pulling count of books
+
+    int book_count = 0;
+    sqlite3_stmt* count_stmt;
+    const char* count_sql = "SELECT COUNT(*) FROM BOOKS;";
+    rc = sqlite3_prepare_v2(
+        db,
+        count_sql,
+        -1,
+        &count_stmt,
+        nullptr
+    );
+    if (rc != SQLITE_OK) {
+        std::cerr << "Error issuing statement." << std::endl << std::endl;
+    } else {
+        rc = sqlite3_step(count_stmt);
+        if (rc == SQLITE_ROW) {
+            book_count = sqlite3_column_int(count_stmt, 0);
+            std::cout << "BOOK_COUNT == " << book_count << std::endl;
+        }
+    }   
+    sqlite3_finalize(count_stmt);
+
+    // statement pulling book names from db
+    const char* items2[book_count];
     static int item_current2 = 0;
-    const char *items2[] = {"Never", "Gonna", "Give", "You", "Up"};
+    sqlite3_stmt* stmt;
+    const char* sql = "SELECT * FROM BOOKS;";
+    
+    rc = sqlite3_prepare_v2(
+        db,
+        sql,
+        -1,
+        &stmt,
+        nullptr
+    );
+    if (rc != SQLITE_OK) {
+        std::cerr << "Error issuing statement." << std::endl << std::endl; 
+    } else {
+        std::cout << "Successfully issued query." << std::endl << std::endl;
+    }
+
+
+    // adding names to listbox array
+    int count = 0;
+    while (sqlite3_step(stmt) == SQLITE_ROW) {
+        items2[count] = (const unsignedchar*)sqlite3_column_text(stmt, 1);
+        std::cout << items2[count] << std::endl;
+        count++;
+    }
+    sqlite3_finalize(stmt);
 
     while (!glfwWindowShouldClose(WINDOW)) {
 
@@ -300,8 +235,6 @@ int main(int argc, char **argv) {
             }
             ImGui::End();
         }
-        //ImGui::ShowDemoWindow(); // Show demo window! :)
-        //ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
         ImGui::Render();
         int display_w, display_h;
@@ -318,41 +251,6 @@ int main(int argc, char **argv) {
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplGlfw_Shutdown();
     ImGui::DestroyContext();
-
-    sqlite3* db;
-    int rc = sqlite3_open("../db/temp.db", &db);
-
-    if (rc != SQLITE_OK) {
-        std::cerr << "Error initializing table... " << std::endl;
-        return -1;
-    }
-
-    auto statement = create_statement(
-        db,
-        "INSERT INTO BOOKS VALUES(@id, @name);"
-    );
-
-
-    
-
-
-
-    int create_code = ExecuteQuery(db, " CREATE TABLE BOOKS (id INTEGER PRIMARY KEY, name VARCHAR(50));");
-    if (create_code == -1) return 0;
-
-    std::ifstream ifs("../db/names.txt");
-    std::string line;
-    while (std::getline(ifs, line)) {
-
-        std::stringstream iss(line);
-        std::string id;
-        std::string name;
-        iss >> id >> name;
-
-        std::string query = "INSERT INTO BOOKS (id, name) VALUES (" + id + ", '" + name + "');";
-        int insert_code = ExecuteQuery(db, query);
-
-    }
 
     return 0;
 
