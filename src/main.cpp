@@ -13,96 +13,32 @@
 #include <GLES2/gl2.h>
 #include <GLFW/glfw3.h>
 
-static bool window = true;
 const char *TABLE_NAME = "BOOKS";
 const char *TABLE_PATH = "../db/books.db";
-
-char *pErrorMessage = nullptr;
-static std::vector<std::string> ColNames;
-static std::vector<std::vector<std::string>> RowValues;
-
+const char *WINDOW_NAME = "BookDB";
 const bool ENABLE_CLOSURE = true;
-static unsigned short print_title_flag = 0;
 
-using statement = std::unique_ptr<sqlite3_stmt, decltype(&sqlite3_finalize)>;
-/*
-    auto statement = create_statement(
-        db,
-        "INSERT INTO BOOKS VALUES(@id, @name);"
-    );
-*/
-statement create_statement(sqlite3* db, std::string sql) {
+int monitorX; int monitorY;
+const int windowX = 400; const int windowY = 500;
 
-    sqlite3_stmt* stmt = nullptr;
-    int rc = sqlite3_prepare_v2(
-        db,
-        sql.c_str(),
-        sql.length(),
-        &stmt,
-        nullptr
-    );
+class WINDOW {
 
-    std::cout << rc << std::endl;
-
-    if (rc != SQLITE_OK) {
-
-        std::cerr << "Unable to create statement '" << sql << std::endl;
-        std::exit(EXIT_FAILURE);
-
-    }
-
-    return statement(stmt, sqlite3_finalize);
-
-}
-
-
-
-static int callback(void *NotUsed, int argc, char **argv, char **ColName) {
-
-    std::stringstream ss;
-
-    if (print_title_flag == 0) {
-        std::stringstream ssCol;
-        for (int i = 0; i < argc; ++i) {
-            ssCol << ColName[i] << " ";            
+    public:
+        
+        int x;
+        int y;
+        bool is_active = true;
+        char *name;
+        WINDOW(int _x, int _y, char *_name) {
+            x = _x;
+            y = _y;
+            name = _name;
         }
-        std::cout << ssCol.str() << std::endl;
-        print_title_flag = 1;
-    }
 
-    for (int i = 0; i < argc; ++i) {
-        std::string rstStr = argv[i] ? argv[i] : "NULL";
-        ss << rstStr << " ";
-    }
-    std::cout << ss.str() << std::endl;
 
-    return 0;
+};
 
-}
-
-static int callback_vector(void *NotUsed, int argc, char **argv, char **ColName) {
-    
-    std::vector<std::string> row;
-    if (print_title_flag == 0) {
-
-        for (int i = 0; i < argc; ++i) {
-            ColNames.push_back((ColName[i]));
-        }    
-
-        print_title_flag = 1;
-
-    } 
-    
-    for (int i = 0; i < argc; ++i) {
-        std::string rowValue = argv[i] ? argv[i] : "NULL";
-        row.push_back(rowValue);
-    }
-
-    RowValues.push_back(row);
-
-    return 0;
-
-}
+WINDOW USER_WINDOW(windowX, windowY, (char *)WINDOW_NAME);
 
 void file_iter_count(std::string path) {
 
@@ -122,16 +58,82 @@ void file_iter_count(std::string path) {
 
 }
 
+void RETURN_CODE_CHECK(int returnCode, std::string cerrMessage = "Unable to create statement.", std::string sqlString = "") {
+
+    if (returnCode != SQLITE_OK) {
+        std::cerr << cerrMessage << " :::> " << sqlString << std::endl;
+        std::exit(EXIT_FAILURE);
+    }
+
+}
+
+using statement = std::unique_ptr<sqlite3_stmt, decltype(&sqlite3_finalize)>;
+statement create_statement(sqlite3* db, std::string sqlString) {
+
+    sqlite3_stmt* stmt;
+    int returnCode = sqlite3_prepare_v2(
+        db,
+        sqlString.c_str(),
+        sqlString.length(),
+        &stmt,
+        nullptr
+    );
+
+    RETURN_CODE_CHECK(returnCode, sqlString);
+    return statement(stmt, sqlite3_finalize);
+
+}
+
+bool ListBoxWrapper(const char* label, int* current_item, std::vector<std::string>& values)
+{
+    auto getter = [](void* data, int idx, const char** out_text) -> bool
+    {
+        auto& vec = *static_cast<std::vector<std::string>*>(data);
+        if (idx < 0 || idx >= static_cast<int>(vec.size()))
+            return false;
+
+        *out_text = vec[idx].c_str();
+        return true;
+    };
+
+    return ImGui::ListBox(label, current_item, getter, &values, values.size());
+    
+}
+
 int main(int argc, char **argv) {
 
     if (!glfwInit()) {
         return 1;
     }
-    
-    GLFWwindow* WINDOW = glfwCreateWindow((int)(1280), (int)(800), "BookDB", nullptr, nullptr);
-    if (WINDOW == nullptr) return 1;
 
-    glfwMakeContextCurrent(WINDOW);
+    sqlite3* db;
+    int rc = sqlite3_open(
+        TABLE_PATH,
+        &db
+    );
+    RETURN_CODE_CHECK(rc, "Error initializing/opening database.");
+
+
+    std::vector<std::string> book_names;
+    static int current_book_ind = 0;
+
+    statement fetch_names_stmt = create_statement(
+        db,
+        "SELECT name FROM BOOKS;"
+    );
+
+    while (sqlite3_step(fetch_names_stmt.get()) == SQLITE_ROW) {
+        const unsigned char * row_text = sqlite3_column_text(fetch_names_stmt.get(), 0);
+        book_names.emplace_back(reinterpret_cast<const char *>(row_text));
+    }
+
+    
+
+    GLFWwindow* GLFW_WINDOW = glfwCreateWindow(USER_WINDOW.x, USER_WINDOW.y, "BookDB", nullptr, nullptr);
+    if (GLFW_WINDOW == nullptr) return 1;
+
+    glfwSetWindowSizeLimits(GLFW_WINDOW, USER_WINDOW.x, USER_WINDOW.y, USER_WINDOW.x, USER_WINDOW.y);
+    glfwMakeContextCurrent(GLFW_WINDOW);
     glfwSwapInterval(1); // Enable vsync
 
     IMGUI_CHECKVERSION();
@@ -139,112 +141,105 @@ int main(int argc, char **argv) {
     ImGuiIO& io = ImGui::GetIO();
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
 
-    ImGui_ImplGlfw_InitForOpenGL(WINDOW, true);          // Second param install_callback=true will install GLFW callbacks and chain to existing ones.
+    ImGui_ImplGlfw_InitForOpenGL(GLFW_WINDOW, true);          // Second param install_callback=true will install GLFW callbacks and chain to existing ones.
     ImGui_ImplOpenGL3_Init();
 
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
-    ImGui::SetNextWindowSize(ImGui::GetIO().DisplaySize);
-    ImGui::SetNextWindowPos(ImVec2(0, 0));
-    
-    // opening db
-    sqlite3* db;
-    int rc = sqlite3_open(
-        TABLE_PATH,
-        &db
-    );
-    if (rc != SQLITE_OK) {
-        std::cerr << "Error initializing/opening database." << std::endl;
-        return 1;
-    }
-
-    // statement pulling count of books
-
-    int book_count = 0;
-    sqlite3_stmt* count_stmt;
-    const char* count_sql = "SELECT COUNT(*) FROM BOOKS;";
-    rc = sqlite3_prepare_v2(
-        db,
-        count_sql,
-        -1,
-        &count_stmt,
-        nullptr
-    );
-    if (rc != SQLITE_OK) {
-        std::cerr << "Error issuing statement." << std::endl << std::endl;
-    } else {
-        rc = sqlite3_step(count_stmt);
-        if (rc == SQLITE_ROW) {
-            book_count = sqlite3_column_int(count_stmt, 0);
-            std::cout << "BOOK_COUNT == " << book_count << std::endl;
-        }
-    }   
-    sqlite3_finalize(count_stmt);
-
-    // statement pulling book names from db
-    const char* items2[book_count];
-    static int item_current2 = 0;
-    sqlite3_stmt* stmt;
-    const char* sql = "SELECT * FROM BOOKS;";
-    
-    rc = sqlite3_prepare_v2(
-        db,
-        sql,
-        -1,
-        &stmt,
-        nullptr
-    );
-    if (rc != SQLITE_OK) {
-        std::cerr << "Error issuing statement." << std::endl << std::endl; 
-    } else {
-        std::cout << "Successfully issued query." << std::endl << std::endl;
-    }
-
-
-    // adding names to listbox array
-    int count = 0;
-    while (sqlite3_step(stmt) == SQLITE_ROW) {
-        items2[count] = (const unsignedchar*)sqlite3_column_text(stmt, 1);
-        std::cout << items2[count] << std::endl;
-        count++;
-    }
-    sqlite3_finalize(stmt);
-
-    while (!glfwWindowShouldClose(WINDOW)) {
-
+        
+    while (!glfwWindowShouldClose(GLFW_WINDOW)) {
+        
         glfwPollEvents();
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
         
+        ImGui::SetNextWindowSize(ImVec2(USER_WINDOW.x, USER_WINDOW.y));
+        ImGui::SetNextWindowPos(ImVec2(0, 0));
         {
-            if (ImGui::Begin("window_name", &window))
+
+            if (ImGui::Begin("Books", &USER_WINDOW.is_active, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize))
             {
 
-                ImGui::SetCursorPos(ImVec2(52,87));
-                ImGui::PushItemWidth(200);
-                static int item_current2 = 0;
-                ImGui::ListBox("##", &item_current2, items2, IM_ARRAYSIZE(items2));
-                ImGui::PopItemWidth();
 
-                ImGui::SetCursorPos(ImVec2(62.5,63.5));
-                ImGui::Text("Book List");
+                ImGui::SetCursorPos(ImVec2(15,25));
+                ImGui::BeginChild(5, ImVec2(372,230), true);
+                {
 
-                ImGui::SetCursorPos(ImVec2(198,183.5));
-                ImGui::Button("Select", ImVec2(50,19)); //remove size argument (ImVec2) to auto-resize
+                    ImGui::SetCursorPos(ImVec2(43.999878,29));
+                    ImGui::PushItemWidth(285);
+                    if (ListBoxWrapper("##Names", &current_book_ind, book_names)) {
+                        // do something else
+                    }
+
+                    ImGui::SetCursorPos(ImVec2(168.5,10));
+                    ImGui::Text("Books");
+
+                    ImGui::SetCursorPos(ImVec2(154,170));
+                    ImGui::Button("Download", ImVec2(64,19)); //remove size argument (ImVec2) to auto-resize
+
+                    ImGui::SetCursorPos(ImVec2(154,200));
+                    ImGui::Button("New Book", ImVec2(64,19));
+
+                }
+                ImGui::EndChild();
+
+
+
+                ImGui::SetCursorPos(ImVec2(204,277));
+                ImGui::BeginChild(10, ImVec2(181,-12), true);
+                {
+
+                    ImGui::SetCursorPos(ImVec2(11,30));
+                    ImGui::Text("Title: ");
+
+                    ImGui::SetCursorPos(ImVec2(11,50));
+                    ImGui::Text("File Size:");
+
+                    ImGui::SetCursorPos(ImVec2(11,70));
+                    ImGui::Text("File Type:");
+
+                    ImGui::SetCursorPos(ImVec2(11,90));
+                    ImGui::Text("Date Added:");
+
+                    ImGui::SetCursorPos(ImVec2(60,30));
+                    ImGui::Text((book_names[current_book_ind]).c_str());
+
+                    ImGui::SetCursorPos(ImVec2(86.5,50));
+                    ImGui::Text("Blank Size");
+
+                    ImGui::SetCursorPos(ImVec2(88,70));
+                    ImGui::Text("Blank Type");
+
+                    ImGui::SetCursorPos(ImVec2(91.5,90));
+                    ImGui::Text("Blank Date");
+
+                }
+                ImGui::EndChild();
+
+
+                
+                ImGui::SetCursorPos(ImVec2(21,281));
+                ImGui::BeginChild(20, ImVec2(171,-16), true);
+                {
+
+                }
+                ImGui::EndChild();
 
             }
+
             ImGui::End();
+
         }
 
         ImGui::Render();
         int display_w, display_h;
-        glfwGetFramebufferSize(WINDOW, &display_w, &display_h);
+        glfwGetFramebufferSize(GLFW_WINDOW, &display_w, &display_h);
         glViewport(0, 0, display_w, display_h);
         glClearColor(clear_color.x * clear_color.w, clear_color.y * clear_color.w, clear_color.z * clear_color.w, clear_color.w);
         glClear(GL_COLOR_BUFFER_BIT);
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
-        glfwSwapBuffers(WINDOW);
+        glfwSwapBuffers(GLFW_WINDOW);
 
     }
 
