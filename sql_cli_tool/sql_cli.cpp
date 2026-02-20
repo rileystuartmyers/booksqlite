@@ -66,8 +66,8 @@ int main(int argc, char** argv) {
     if (argc < 2) {
 
         std::cout << "--- Usage: {your_database}.db ---" << std::endl;
-        std::cout << "--- After providing a database file, user is continuously prompted for SQL queries. ---" << std::endl;
-        std::cout << "--- Once finished, type 'exit' --- " << std::endl;
+        std::cout << "--- After providing a database file, you will be prompted for SQL queries. ---" << std::endl;
+        std::cout << "--- When finished, type 'exit' --- " << std::endl;
         return 0;
 
     }
@@ -108,7 +108,7 @@ int main(int argc, char** argv) {
         std::cout << "Enter a query..." << std::endl;
         std::getline(std::cin, sql);
 
-        if (sql == "exit" || sql == "EXIT" || sql == "Exit") { 
+        if (sql == "exit" || sql == "EXIT" || sql == "Exit" || sql == "quit" || sql == "QUIT") { 
             break; 
         } else if (sql == "clear" || sql == "CLEAR" || sql == "Clear") {
             ClearScreen();

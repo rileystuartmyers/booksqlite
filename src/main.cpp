@@ -20,6 +20,47 @@ const bool ENABLE_CLOSURE = true;
 
 int monitorX; int monitorY;
 const int windowX = 400; const int windowY = 500;
+const int VARCHAR_LENGTH = 50;
+
+class Book {
+
+    private:
+
+        int id;
+        std::string title;
+        std::string author;
+        std::string file_type;
+        long int file_size;
+        std::string date_modified;
+
+    public:
+
+        Book(int _id, const unsigned char *_title, const unsigned char *_author, const unsigned char *_file_type, long int _file_size, const unsigned char *_date_modified) {
+            
+            std::cout << "Creating book " << _id << std::endl;
+            if (!_title || !_author || !_file_type || !_date_modified) {
+                std::cerr << "Failed to load book: Invalid or null entry. :::>    id=" << _id << std::endl;
+                return;
+            }
+
+
+            id = _id;
+            title = reinterpret_cast<const char *>(_title);
+            author = reinterpret_cast<const char *>(_author);
+            file_type = reinterpret_cast<const char *>(_file_type);
+            file_size = _file_size;
+            date_modified = reinterpret_cast<const char *>(_date_modified);
+
+        }
+
+        int getid() const { return id; }
+        const char *gettitle() { return title.c_str(); }
+        const char *getauthor() { return author.c_str(); }
+        const char *gettype() { return file_type.c_str(); }
+        long int getsize() const { return file_size; }
+        const char *getdate() { return date_modified.c_str(); }
+
+};
 
 class WINDOW {
 
@@ -28,13 +69,13 @@ class WINDOW {
         int x;
         int y;
         bool is_active = true;
-        char *name;
+        const char *name;
+
         WINDOW(int _x, int _y, char *_name) {
             x = _x;
             y = _y;
             name = _name;
         }
-
 
 };
 
@@ -79,7 +120,7 @@ statement create_statement(sqlite3* db, std::string sqlString) {
         nullptr
     );
 
-    RETURN_CODE_CHECK(returnCode, sqlString);
+    RETURN_CODE_CHECK(returnCode, "Unable to issue SQL statement", sqlString);
     return statement(stmt, sqlite3_finalize);
 
 }
@@ -113,21 +154,31 @@ int main(int argc, char **argv) {
     );
     RETURN_CODE_CHECK(rc, "Error initializing/opening database.");
 
+    statement fetch_books_statement = create_statement(
+        db,
+        "SELECT * FROM BOOKS;"
+    );
+    
 
-    std::vector<std::string> book_names;
+    std::vector<Book> books;
+    std::vector<std::string> names(1);
     static int current_book_ind = 0;
 
-    statement fetch_names_stmt = create_statement(
-        db,
-        "SELECT name FROM BOOKS;"
-    );
+    while (sqlite3_step(fetch_books_statement.get()) == SQLITE_ROW) {
 
-    while (sqlite3_step(fetch_names_stmt.get()) == SQLITE_ROW) {
-        const unsigned char * row_text = sqlite3_column_text(fetch_names_stmt.get(), 0);
-        book_names.emplace_back(reinterpret_cast<const char *>(row_text));
+        names.emplace_back(
+            reinterpret_cast<const char *>(sqlite3_column_text(fetch_books_statement.get(), 1))
+        );
+        books.emplace_back(
+            sqlite3_column_int(fetch_books_statement.get(), 0),
+            sqlite3_column_text(fetch_books_statement.get(), 1),
+            sqlite3_column_text(fetch_books_statement.get(), 2),
+            sqlite3_column_text(fetch_books_statement.get(), 3),
+            sqlite3_column_int64(fetch_books_statement.get(), 4),
+            sqlite3_column_text(fetch_books_statement.get(), 5)
+        );
+        
     }
-
-    
 
     GLFWwindow* GLFW_WINDOW = glfwCreateWindow(USER_WINDOW.x, USER_WINDOW.y, "BookDB", nullptr, nullptr);
     if (GLFW_WINDOW == nullptr) return 1;
@@ -160,14 +211,13 @@ int main(int argc, char **argv) {
             if (ImGui::Begin("Books", &USER_WINDOW.is_active, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize))
             {
 
-
                 ImGui::SetCursorPos(ImVec2(15,25));
                 ImGui::BeginChild(5, ImVec2(372,230), true);
                 {
 
                     ImGui::SetCursorPos(ImVec2(43.999878,29));
                     ImGui::PushItemWidth(285);
-                    if (ListBoxWrapper("##Names", &current_book_ind, book_names)) {
+                    if (ListBoxWrapper("##Names", &current_book_ind, names)) {
                         // do something else
                     }
 
@@ -181,6 +231,7 @@ int main(int argc, char **argv) {
                     ImGui::Button("New Book", ImVec2(64,19));
 
                 }
+                
                 ImGui::EndChild();
 
 
@@ -189,33 +240,50 @@ int main(int argc, char **argv) {
                 ImGui::BeginChild(10, ImVec2(181,-12), true);
                 {
 
-                    ImGui::SetCursorPos(ImVec2(11,30));
-                    ImGui::Text("Title: ");
+                    ImGui::SetCursorPos(ImVec2(8,30));
+                    ImGui::Text("Title:");
 
-                    ImGui::SetCursorPos(ImVec2(11,50));
-                    ImGui::Text("File Size:");
+                    ImGui::SetCursorPos(ImVec2(8,50));
+                    ImGui::Text("Author:");
 
-                    ImGui::SetCursorPos(ImVec2(11,70));
+                    ImGui::SetCursorPos(ImVec2(8,90));
                     ImGui::Text("File Type:");
 
-                    ImGui::SetCursorPos(ImVec2(11,90));
+                    ImGui::SetCursorPos(ImVec2(8,70));
+                    ImGui::Text("File Size:");
+                    
+                    ImGui::SetCursorPos(ImVec2(8,110));
                     ImGui::Text("Date Added:");
 
-                    ImGui::SetCursorPos(ImVec2(60,30));
-                    ImGui::Text((book_names[current_book_ind]).c_str());
 
-                    ImGui::SetCursorPos(ImVec2(86.5,50));
-                    ImGui::Text("Blank Size");
+                    if (!books.empty()) {
 
-                    ImGui::SetCursorPos(ImVec2(88,70));
-                    ImGui::Text("Blank Type");
+                        // Title Box
+                        ImGui::SetCursorPos(ImVec2(53,30));
+                        ImGui::Text("%s", books[current_book_ind].gettitle());
+                        
+                        // Author Box
+                        ImGui::SetCursorPos(ImVec2(60,50));
+                        ImGui::Text("%s", books[current_book_ind].getauthor());
+                        
+                        // File Type Box
+                        ImGui::SetCursorPos(ImVec2(82,70));
+                        ImGui::Text("%s", books[current_book_ind].gettype());
 
-                    ImGui::SetCursorPos(ImVec2(91.5,90));
-                    ImGui::Text("Blank Date");
+                        // File Size Box
+                        ImGui::SetCursorPos(ImVec2(82,90));
+                        ImGui::Text("%ld", books[current_book_ind].getsize());
 
+                        // Date Modified Box
+                        ImGui::SetCursorPos(ImVec2(92,110));
+                        ImGui::Text("%s", books[current_book_ind].getdate());
+
+                    }
+                    
                 }
+                
                 ImGui::EndChild();
-
+                
 
                 
                 ImGui::SetCursorPos(ImVec2(21,281));
