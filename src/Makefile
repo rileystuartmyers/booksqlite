@@ -1,15 +1,21 @@
 EXE = main
 IMGUI_DIR = ../include/imgui
+NFD_DIR = ../include/nativefiledialog/src
 INCLUDE_DIR = ../include
 
 SOURCES = main.cpp
 SOURCES += $(IMGUI_DIR)/imgui.cpp $(IMGUI_DIR)/imgui_draw.cpp $(IMGUI_DIR)/imgui_tables.cpp $(IMGUI_DIR)/imgui_widgets.cpp
-SOURCES += $(IMGUI_DIR)/backends/imgui_impl_glfw.cpp $(IMGUI_DIR)/backends/imgui_impl_opengl3.cpp
-OBJS = $(addsuffix .o, $(basename $(notdir $(SOURCES)))) ${INCLUDE_DIR}/sqlite3.o
+SOURCES += $(IMGUI_DIR)/backends/imgui_impl_glfw.cpp $(IMGUI_DIR)/backends/imgui_impl_opengl3.cpp $(NFD_DIR)/nfd_common.c $(NFD_DIR)/nfd_gtk.c
+
+OBJS = $(SOURCES:.cpp=.o)
+OBJS := $(OBJS:.c=.o)
+OBJS += ${INCLUDE_DIR}/sqlite3.o
+
 UNAME_S := $(shell uname -s)
 LINUX_GL_LIBS = -lGL
 
-CXXFLAGS = -std=c++11 -I$(IMGUI_DIR) -I$(IMGUI_DIR)/backends
+
+CXXFLAGS = -std=c++11 -I$(IMGUI_DIR) -I$(IMGUI_DIR)/backends -I$(NFD_DIR)
 CXXFLAGS += -g
 LIBS =
 
@@ -28,8 +34,10 @@ LIBS =
 ifeq ($(UNAME_S), Linux) #LINUX
 	ECHO_MESSAGE = "Linux"
 	LIBS += $(LINUX_GL_LIBS) `pkg-config --static --libs glfw3`
+	LIBS += `pkg-config --libs gtk+-3.0`
 
 	CXXFLAGS += `pkg-config --cflags glfw3`
+	CXXFLAGS += `pkg-config --cflags gtk+-3.0`
 	CFLAGS = $(CXXFLAGS)
 endif
 
@@ -55,6 +63,11 @@ endif
 ##---------------------------------------------------------------------
 ## BUILD RULES
 ##---------------------------------------------------------------------
+
+CC = gcc
+
+%.o:%.c
+	$(CC) $(CXXFLAGS) -c -o $@ $<
 
 %.o:%.cpp
 	$(CXX) $(CXXFLAGS) -c -o $@ $<

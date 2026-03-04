@@ -127,9 +127,7 @@ int main(int argc, char** argv) {
         if (epub.empty()) {
             std::cerr << "EPUB empty." << std::endl;
             return -1;
-        }
-
-        if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) {
+        } else if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) {
             std::cerr << "Prepare failed." << std::endl;
             return -1;
         }

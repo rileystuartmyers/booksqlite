@@ -5,13 +5,14 @@
 #include <memory>
 
 #include <sqlite3.h>
-
-#include "../include/imgui/imgui.h"
-#include "../include/imgui/backends/imgui_impl_glfw.h"
-#include "../include/imgui/backends/imgui_impl_opengl3.h"
-
 #include <GLES2/gl2.h>
 #include <GLFW/glfw3.h>
+
+#include <imgui.h>
+#include <imgui_impl_glfw.h>
+#include <imgui_impl_opengl3.h>
+
+#include <nfd.h>
 
 const char *TABLE_NAME = "BOOKS";
 const char *TABLE_PATH = "../db/books.db";
@@ -37,7 +38,6 @@ class Book {
 
         Book(int _id, const unsigned char *_title, const unsigned char *_author, const unsigned char *_file_type, long int _file_size, const unsigned char *_date_modified) {
             
-            std::cout << "Creating book " << _id << std::endl;
             if (!_title || !_author || !_file_type || !_date_modified) {
                 std::cerr << "Failed to load book: Invalid or null entry. :::>    id=" << _id << std::endl;
                 return;
@@ -77,9 +77,7 @@ class WINDOW {
             name = _name;
         }
 
-};
-
-WINDOW USER_WINDOW(windowX, windowY, (char *)WINDOW_NAME);
+}; WINDOW USER_WINDOW(windowX, windowY, (char *)WINDOW_NAME);
 
 void file_iter_count(std::string path) {
 
@@ -141,6 +139,23 @@ bool ListBoxWrapper(const char* label, int* current_item, std::vector<std::strin
     
 }
 
+std::vector<unsigned char> readFile(std::string& path) {
+    
+    std::ifstream file(path, std::ios::binary | std::ios::ate);
+    if (!file) {
+        throw std::runtime_error("Failed to open file");
+    }
+
+    std::streamsize size = file.tellg();
+    file.seekg(0, std::ios::beg);
+    
+    std::vector<unsigned char> buffer(size);
+    file.read(reinterpret_cast<char*>(buffer.data()), size);
+
+    return buffer;
+
+}
+
 int main(int argc, char **argv) {
 
     if (!glfwInit()) {
@@ -161,7 +176,7 @@ int main(int argc, char **argv) {
     
 
     std::vector<Book> books;
-    std::vector<std::string> names(1);
+    std::vector<std::string> names;
     static int current_book_ind = 0;
 
     while (sqlite3_step(fetch_books_statement.get()) == SQLITE_ROW) {
@@ -169,7 +184,8 @@ int main(int argc, char **argv) {
         names.emplace_back(
             reinterpret_cast<const char *>(sqlite3_column_text(fetch_books_statement.get(), 1))
         );
-        books.emplace_back(
+        
+        Book new_book(
             sqlite3_column_int(fetch_books_statement.get(), 0),
             sqlite3_column_text(fetch_books_statement.get(), 1),
             sqlite3_column_text(fetch_books_statement.get(), 2),
@@ -177,6 +193,8 @@ int main(int argc, char **argv) {
             sqlite3_column_int64(fetch_books_statement.get(), 4),
             sqlite3_column_text(fetch_books_statement.get(), 5)
         );
+
+        books.push_back(new_book);
         
     }
 
@@ -215,20 +233,45 @@ int main(int argc, char **argv) {
                 ImGui::BeginChild(5, ImVec2(372,230), true);
                 {
 
-                    ImGui::SetCursorPos(ImVec2(43.999878,29));
-                    ImGui::PushItemWidth(285);
-                    if (ListBoxWrapper("##Names", &current_book_ind, names)) {
-                        // do something else
-                    }
-
                     ImGui::SetCursorPos(ImVec2(168.5,10));
                     ImGui::Text("Books");
 
+                    ImGui::SetCursorPos(ImVec2(43.999878,29));
+                    ImGui::PushItemWidth(285);
+                    if (ListBoxWrapper("##Names", &current_book_ind, names)) {
+                        printf("List Box clicked!\n");
+                    }
+
                     ImGui::SetCursorPos(ImVec2(154,170));
-                    ImGui::Button("Download", ImVec2(64,19)); //remove size argument (ImVec2) to auto-resize
+                    if ( (ImGui::Button("Download", ImVec2(64,19))) && (!books.empty()) ){
+                        printf("Download button clicked!\n");
+                    }
 
                     ImGui::SetCursorPos(ImVec2(154,200));
-                    ImGui::Button("New Book", ImVec2(64,19));
+                    if ( ImGui::Button("New Book", ImVec2(64,19)) && (!books.empty()) ) {
+
+                        nfdchar_t *path = nullptr;
+                        nfdresult_t result = NFD_OpenDialog(NULL, NULL, &path);
+
+                        if (result == NFD_OKAY) {
+
+                            std::string path2 = path;
+                            std::vector<unsigned char> epub = readFile(path2);
+                            if (epub.empty()) {
+                                std::cerr << "File is empty..." << std::endl;
+                                return -1;
+                            }
+                            
+                            free(path);
+                        }
+                        else if (result == NFD_CANCEL) {
+                            puts("User pressed cancel.");
+                        }
+                        else {
+                            printf("Error: %s\n", NFD_GetError() );
+                        }
+
+                    }
 
                 }
                 
@@ -285,13 +328,13 @@ int main(int argc, char **argv) {
                 ImGui::EndChild();
                 
 
-                
                 ImGui::SetCursorPos(ImVec2(21,281));
                 ImGui::BeginChild(20, ImVec2(171,-16), true);
                 {
 
                 }
                 ImGui::EndChild();
+
 
             }
 
