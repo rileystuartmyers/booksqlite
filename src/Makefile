@@ -15,7 +15,7 @@ UNAME_S := $(shell uname -s)
 LINUX_GL_LIBS = -lGL
 
 
-CXXFLAGS = -std=c++11 -I$(IMGUI_DIR) -I$(IMGUI_DIR)/backends -I$(NFD_DIR)
+CXXFLAGS = -std=c++17 -lstdc++fs -I$(IMGUI_DIR) -I$(IMGUI_DIR)/backends -I$(NFD_DIR) 
 CXXFLAGS += -g
 LIBS =
 
