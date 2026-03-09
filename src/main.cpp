@@ -5,6 +5,7 @@
 #include <memory>
 #include <filesystem>
 #include <ctime>
+#include <algorithm>
 
 #include <sqlite3.h>
 #include <GLES2/gl2.h>
@@ -15,6 +16,10 @@
 #include <imgui_impl_opengl3.h>
 
 #include <nfd.h>
+
+const unsigned char* InsertWithNullCheck(const unsigned char* str) {
+    return str ? str : reinterpret_cast<const unsigned char*>("");
+}
 
 class Book {
 
@@ -30,19 +35,13 @@ class Book {
     public:
 
         Book(int _id, const unsigned char *_title, const unsigned char *_author, const unsigned char *_file_type, long int _file_size, const unsigned char *_date_modified) {
-            
-            if (!_title || !_author || !_file_type || !_date_modified) {
-                std::string err_msg = "Failed to load book: Invalid or null entry. :::>    id=" + _id;
-                throw std::runtime_error(err_msg);
-                return;
-            }
 
             id = _id;
-            title = reinterpret_cast<const char *>(_title);
-            author = reinterpret_cast<const char *>(_author);
-            file_type = reinterpret_cast<const char *>(_file_type);
+            title = _title ? reinterpret_cast<const char *>(_title) : "";
+            author = _author ? reinterpret_cast<const char *>(_author) : "";
+            file_type = _file_type ? reinterpret_cast<const char *>(_file_type) : "";
             file_size = _file_size;
-            date_modified = reinterpret_cast<const char *>(_date_modified);
+            date_modified = _date_modified ? reinterpret_cast<const char *>(_date_modified) : "";
 
         }
 
@@ -68,12 +67,6 @@ class WINDOW {
             x = _x;
             y = _y;
             name = _name;
-        }
-
-        void switch_active() {
-
-            is_active = !is_active;
-
         }
 
 }; 
@@ -102,7 +95,7 @@ std::vector<std::string> names;
 static int current_book_ind = 0;
 
 void file_iter_count(std::string path) {
-
+    
     int count;
 
     std::ifstream iff(path);
@@ -135,7 +128,7 @@ statement create_statement(sqlite3* db, std::string sqlString) {
     int returnCode = sqlite3_prepare_v2(
         db,
         sqlString.c_str(),
-        sqlString.length(),
+        -1,
         &stmt,
         nullptr
     );
@@ -163,19 +156,24 @@ bool ListBoxWrapper(const char* label, int* current_item, std::vector<std::strin
 
 void RefreshBookList(std::vector<Book> &books, std::vector<std::string> &names, statement &stmt) {
 
+    books.clear();
+    names.clear();
+    sqlite3_reset(stmt.get());
     while (sqlite3_step(stmt.get()) == SQLITE_ROW) {
 
+        std::cout << sqlite3_column_text(stmt.get(), 1) << std::endl;
         names.emplace_back(
-            reinterpret_cast<const char *>(sqlite3_column_text(stmt.get(), 1))
+            reinterpret_cast<const char *>(InsertWithNullCheck(sqlite3_column_text(stmt.get(), 1)))
         );
         
         Book new_book(
+
             sqlite3_column_int(stmt.get(), 0),
-            sqlite3_column_text(stmt.get(), 1),
-            sqlite3_column_text(stmt.get(), 2),
-            sqlite3_column_text(stmt.get(), 3),
+            InsertWithNullCheck(sqlite3_column_text(stmt.get(), 1)),
+            InsertWithNullCheck(sqlite3_column_text(stmt.get(), 2)),
+            InsertWithNullCheck(sqlite3_column_text(stmt.get(), 3)),
             sqlite3_column_int64(stmt.get(), 4),
-            sqlite3_column_text(stmt.get(), 5)
+            InsertWithNullCheck(sqlite3_column_text(stmt.get(), 5))
         );
 
         books.push_back(new_book);
@@ -205,34 +203,35 @@ std::vector<unsigned char> readFile(std::string& path) {
 int main(int argc, char **argv) {
 
     NEWBOOK_WINDOW.is_active = false;
+    int rc = sqlite3_initialize();
 
-    if (!glfwInit()) {
-        return 1;
+    if (rc != SQLITE_OK) {
+        std::cerr << "sqlite3Init error. Exiting..." << std::endl;
+        return -1;
     }
-
+    else if (!glfwInit()) {
+        std::cerr << "glfwInit error. Exiting..." << std::endl;
+        return -2;
+    }
+    
     sqlite3* db;
-    int rc = sqlite3_open(
+    rc = sqlite3_open(
         TABLE_PATH,
         &db
     );
     RETURN_CODE_CHECK(rc, "Error initializing/opening database.");
-
+    
     statement fetch_books_statement = create_statement(
         db,
-        "SELECT * FROM BOOKS;"
+        "SELECT id, title, author, file_type, file_size, date_modified FROM BOOKS WHERE title IS NOT NULL;"
     );
-
+    
     statement insert_book_statement = create_statement(
         db,
         "INSERT INTO BOOKS(title, author, file_type, file_size, date_modified, binary) VALUES (?, ?, ?, ?, ?, ?);"
     );
     
-
-
-    RefreshBookList(books, names, insert_book_statement);
-
-
-
+    RefreshBookList(books, names, fetch_books_statement);
 
 
     GLFWwindow* GLFW_WINDOW = glfwCreateWindow(USER_WINDOW.x, USER_WINDOW.y, "BookDB", nullptr, nullptr);
@@ -305,7 +304,6 @@ int main(int argc, char **argv) {
                             } else {
                                 
                                 selected_path = path;
-                                epub = readFile(selected_path);
                                 NEWBOOK_WINDOW.is_active = true;
 
                                 std::filesystem::path p(selected_path);
@@ -354,14 +352,13 @@ int main(int argc, char **argv) {
                     ImGui::Text("Author:");
 
                     ImGui::SetCursorPos(ImVec2(8,90));
-                    ImGui::Text("File Type:");
+                    ImGui::Text("File Size:");
 
                     ImGui::SetCursorPos(ImVec2(8,70));
-                    ImGui::Text("File Size:");
+                    ImGui::Text("File Type:");
                     
                     ImGui::SetCursorPos(ImVec2(8,110));
                     ImGui::Text("Date Added:");
-
 
                     if (!books.empty()) {
 
@@ -457,9 +454,6 @@ int main(int argc, char **argv) {
 
                         ImGui::SetCursorPos(ImVec2(290, 199));
                         if (ImGui::Button("Add Book", ImVec2(70, 20))) {
-
-                            //"INSERT INTO BOOKS(id, title, author, file_type, file_size, date_modified, binary)
-
                             
                             sqlite3_bind_text(insert_book_statement.get(), 1, file_name, -1, SQLITE_TRANSIENT);
                             sqlite3_bind_text(insert_book_statement.get(), 2, author_name, -1, SQLITE_TRANSIENT);
@@ -476,6 +470,7 @@ int main(int argc, char **argv) {
                                 std::cerr << "Insert failed :::> " << sqlite3_errmsg(db) << std::endl;
                             }
 
+                            std::cout << "Return Code: " << rc << std::endl;
                             sqlite3_reset(insert_book_statement.get());
                             sqlite3_clear_bindings(insert_book_statement.get());
 
@@ -497,10 +492,10 @@ int main(int argc, char **argv) {
                             memset(date_time, ' ', BUFFER_SIZE);
                             date_time[BUFFER_SIZE - 1] = '\0';
                             
+                            
+                            RefreshBookList(books, names, fetch_books_statement);
+                            
                             file_size_int = 0;
-                                
-                            RefreshBookList(books, names, insert_book_statement);
-
                             NEWBOOK_WINDOW.is_active = false;
                             
                         }
