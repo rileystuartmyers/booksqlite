@@ -7,6 +7,8 @@
 #include <ctime>
 #include <algorithm>
 
+#include <zlib.h>
+
 #include <sqlite3.h>
 #include <GLES2/gl2.h>
 #include <GLFW/glfw3.h>
@@ -138,6 +140,52 @@ statement create_statement(sqlite3* db, std::string sqlString) {
 
 }
 
+struct precompiled_sqliteStatements {
+
+    sqlite3* db;
+    statement fetch_stmt;
+    statement insert_stmt;
+    statement delete_stmt;
+    statement download_stmt;
+    
+    precompiled_sqliteStatements(sqlite3* db_ptr) :
+    
+        db(db_ptr),
+
+        fetch_stmt(
+            create_statement(
+                db,
+                "SELECT id, title, author, file_type, file_size, date_modified FROM BOOKS WHERE title IS NOT NULL;"
+            )
+        ),
+
+        insert_stmt(
+            create_statement(
+                db,
+                "INSERT INTO BOOKS(title, author, file_type, file_size, date_modified, binary) VALUES (?, ?, ?, ?, ?, ?);"
+            )
+        ),
+    
+        delete_stmt(
+            create_statement(
+                db,
+                "DELETE FROM BOOKS WHERE id = ?;"
+            )
+        ),
+
+        download_stmt(
+            create_statement(
+                db,
+                "SELECT title, file_type, binary FROM BOOKS WHERE id = ?"
+            )
+        )
+
+    {}
+
+    ~precompiled_sqliteStatements() = default;
+
+};
+
 bool ListBoxWrapper(const char* label, int* current_item, std::vector<std::string>& values)
 {
     auto getter = [](void* data, int idx, const char** out_text) -> bool
@@ -161,7 +209,6 @@ void RefreshBookList(std::vector<Book> &books, std::vector<std::string> &names, 
     sqlite3_reset(stmt.get());
     while (sqlite3_step(stmt.get()) == SQLITE_ROW) {
 
-        std::cout << sqlite3_column_text(stmt.get(), 1) << std::endl;
         names.emplace_back(
             reinterpret_cast<const char *>(InsertWithNullCheck(sqlite3_column_text(stmt.get(), 1)))
         );
@@ -183,6 +230,111 @@ void RefreshBookList(std::vector<Book> &books, std::vector<std::string> &names, 
 
 }
 
+std::vector<unsigned char> CompressBlob(std::vector<unsigned char>& blob) {
+
+    uLong src_size = blob.size();
+    ulong dest_size = compressBound(src_size);
+    std::vector<unsigned char> compressed_blob(dest_size);
+    
+    int res = compress2(
+        compressed_blob.data(),
+        &dest_size,
+        blob.data(),
+        src_size,
+        Z_BEST_COMPRESSION
+    );
+    
+    if (res != Z_OK){
+        throw std::runtime_error("Compression failed.");
+    }
+
+    compressed_blob.resize(dest_size);
+    return compressed_blob;
+    
+}
+
+std::vector<unsigned char> DecompressBlob(std::vector<unsigned char>& compressed_blob, size_t original_size) {
+
+    std::vector<unsigned char> decompressed_blob(original_size);
+    uLongf dest_size = original_size;
+
+    int res = uncompress(
+        decompressed_blob.data(),
+        &dest_size,
+        compressed_blob.data(),
+        compressed_blob.size()
+    );
+
+    if (res != Z_OK) {
+        throw std::runtime_error("Decompression failed.");
+    }
+    
+    return decompressed_blob;
+
+}
+
+std::vector<unsigned char> ReadVoidBlobIntoVector(const void* blob, int size) {
+
+    std::vector<unsigned char> blob_vector;
+    const unsigned char* blob_bytes = static_cast<const unsigned char*>(blob);
+
+    blob_vector.assign(blob_bytes, blob_bytes + size);
+    return blob_vector;
+
+}
+
+void DeleteEpubById(statement& stmt, int id) {
+
+    sqlite3_bind_int64(stmt.get(), 1, id);
+
+    if (sqlite3_step(stmt.get()) != SQLITE_DONE) {
+        std::cerr << "Error deleting book." << std::endl;
+    }
+    
+    sqlite3_reset(stmt.get()); 
+    sqlite3_clear_bindings(stmt.get());
+
+    //RefreshBookList();
+    return;
+
+}
+
+void DownloadEpubById(statement& stmt, int id) {
+
+    sqlite3_bind_int64(stmt.get(), 1, id);
+
+    if (sqlite3_step(stmt.get()) == SQLITE_ROW) {
+
+        std::string book_title = reinterpret_cast<const char*>(sqlite3_column_text(stmt.get(), 0));
+        std::string book_file_type = reinterpret_cast<const char*>(sqlite3_column_text(stmt.get(), 1));
+        
+        std::vector<unsigned char> compressed_blob = ReadVoidBlobIntoVector(
+            (void*) sqlite3_column_blob(stmt.get(), 2), 
+            (int) sqlite3_column_bytes(stmt.get(), 2)
+        );
+
+        std::vector<unsigned char> decompressed_blob = DecompressBlob(
+            compressed_blob, 
+            (size_t) sqlite3_column_bytes(stmt.get(), 2)
+        );
+
+        std::ofstream out(book_title + book_file_type, std::ios::binary);
+        out.write(reinterpret_cast<const char*>(decompressed_blob.data()), decompressed_blob.size());
+        out.close();
+
+        std::cout << "File downloaded successfully." << std::endl;
+        
+    } else {
+
+        std::cerr << "Book not found." << std::endl;   
+
+    }
+    
+    sqlite3_reset(stmt.get()); 
+    sqlite3_clear_bindings(stmt.get());
+    return;
+
+}
 std::vector<unsigned char> readFile(std::string& path) {
     
     std::ifstream file(path, std::ios::binary | std::ios::ate);
@@ -221,17 +373,9 @@ int main(int argc, char **argv) {
     );
     RETURN_CODE_CHECK(rc, "Error initializing/opening database.");
     
-    statement fetch_books_statement = create_statement(
-        db,
-        "SELECT id, title, author, file_type, file_size, date_modified FROM BOOKS WHERE title IS NOT NULL;"
-    );
-    
-    statement insert_book_statement = create_statement(
-        db,
-        "INSERT INTO BOOKS(title, author, file_type, file_size, date_modified, binary) VALUES (?, ?, ?, ?, ?, ?);"
-    );
-    
-    RefreshBookList(books, names, fetch_books_statement);
+    precompiled_sqliteStatements sqliteStatements(db);
+
+    RefreshBookList(books, names, sqliteStatements.fetch_stmt);
 
 
     GLFWwindow* GLFW_WINDOW = glfwCreateWindow(USER_WINDOW.x, USER_WINDOW.y, "BookDB", nullptr, nullptr);
@@ -276,18 +420,29 @@ int main(int argc, char **argv) {
                     ImGui::SetCursorPos(ImVec2(43.999878,29));
                     ImGui::PushItemWidth(285);
                     if (ListBoxWrapper("##Names", &current_book_ind, names)) {
-                        printf("List Box clicked!\n");
+                        ImGui::SetItemDefaultFocus();
                     }
 
 
+                    ImGui::SetCursorPos(ImVec2(230, 170));
+                    if ( (ImGui::Button("Delete", ImVec2(56, 19))) && (!books.empty()) ) {
+
+                        DeleteEpubById(sqliteStatements.delete_stmt, books[current_book_ind].getid());
+                        RefreshBookList(books, names, sqliteStatements.fetch_stmt);
+                        current_book_ind = 0;
+
+                    }
+
                     ImGui::SetCursorPos(ImVec2(154,170));
                     if ( (ImGui::Button("Download", ImVec2(64,19))) && (!books.empty()) ){
-                        printf("Download button clicked!\n");
+
+                        DownloadEpubById(sqliteStatements.download_stmt, books[current_book_ind].getid());
+
                     }
 
                     
                     ImGui::SetCursorPos(ImVec2(154,200));
-                    if ( ImGui::Button("New Book", ImVec2(64,19)) && (!books.empty()) ) {
+                    if (ImGui::Button("New Book", ImVec2(64,19))) {
 
                         nfdchar_t *path = nullptr;
                         nfdresult_t result = NFD_OpenDialog(NULL, NULL, &path);
@@ -309,13 +464,13 @@ int main(int argc, char **argv) {
                                 std::filesystem::path p(selected_path);
                                 strcpy(file_name, p.stem().string().c_str());
                                 strcpy(extension, p.extension().string().c_str());
-
-                                file_size_int = std::filesystem::file_size(p) / 1000;
+                               
+                                file_size_int = std::filesystem::file_size(p);
                                 std::string file_size_str = std::to_string(file_size_int);
-                                char size_label[5] = " kB\0";
+                                char size_label[5] = " B\0";
                                 strcpy(file_size, file_size_str.c_str());
                                 memcpy(file_size + file_size_str.length(), size_label, 5);
-
+                                
                                 time_t now = time(0);
                                 strftime(date_time, sizeof(date_time), "%m/%d/%Y", localtime(&now));
 
@@ -336,9 +491,7 @@ int main(int argc, char **argv) {
                     }
 
                 }
-                
                 ImGui::EndChild();
-
 
 
                 ImGui::SetCursorPos(ImVec2(204,277));
@@ -352,7 +505,7 @@ int main(int argc, char **argv) {
                     ImGui::Text("Author:");
 
                     ImGui::SetCursorPos(ImVec2(8,90));
-                    ImGui::Text("File Size:");
+                    ImGui::Text("Size (Bytes):");
 
                     ImGui::SetCursorPos(ImVec2(8,70));
                     ImGui::Text("File Type:");
@@ -375,7 +528,7 @@ int main(int argc, char **argv) {
                         ImGui::Text("%s", books[current_book_ind].gettype());
 
                         // File Size Box
-                        ImGui::SetCursorPos(ImVec2(82,90));
+                        ImGui::SetCursorPos(ImVec2(102,90));
                         ImGui::Text("%ld", books[current_book_ind].getsize());
 
                         // Date Modified Box
@@ -384,8 +537,7 @@ int main(int argc, char **argv) {
 
                     }
                     
-                }
-                
+                }            
                 ImGui::EndChild();
                 
                 // place of image 
@@ -415,7 +567,7 @@ int main(int argc, char **argv) {
                         ImGui::Text("Author:");
 
                         ImGui::SetCursorPos(ImVec2(20,80));
-                        ImGui::Text("File Size:");
+                        ImGui::Text("Size (Bytes):");
 
                         ImGui::SetCursorPos(ImVec2(20,110));
                         ImGui::Text("File Type:");
@@ -455,45 +607,43 @@ int main(int argc, char **argv) {
                         ImGui::SetCursorPos(ImVec2(290, 199));
                         if (ImGui::Button("Add Book", ImVec2(70, 20))) {
                             
-                            sqlite3_bind_text(insert_book_statement.get(), 1, file_name, -1, SQLITE_TRANSIENT);
-                            sqlite3_bind_text(insert_book_statement.get(), 2, author_name, -1, SQLITE_TRANSIENT);
-                            sqlite3_bind_text(insert_book_statement.get(), 3, extension, -1, SQLITE_TRANSIENT);
-                            sqlite3_bind_int64(insert_book_statement.get(), 4, file_size_int);
-                            sqlite3_bind_text(insert_book_statement.get(), 5, date_time, -1, SQLITE_TRANSIENT);
-                            sqlite3_bind_blob(insert_book_statement.get(), 6, epub.data(), epub.size(), SQLITE_TRANSIENT);
+                            std::vector<unsigned char> compressed_blob = CompressBlob(epub);
 
-                            std::cout << file_name << ", " << author_name << ", " << extension << ", " << file_size_int << ", " <<
-                            date_time << ", " << epub.data() << std::endl;
+                            sqlite3_bind_text(sqliteStatements.insert_stmt.get(), 1, file_name, -1, SQLITE_TRANSIENT);
+                            sqlite3_bind_text(sqliteStatements.insert_stmt.get(), 2, author_name, -1, SQLITE_TRANSIENT);
+                            sqlite3_bind_text(sqliteStatements.insert_stmt.get(), 3, extension, -1, SQLITE_TRANSIENT);
+                            sqlite3_bind_int64(sqliteStatements.insert_stmt.get(), 4, file_size_int);
+                            sqlite3_bind_text(sqliteStatements.insert_stmt.get(), 5, date_time, -1, SQLITE_TRANSIENT);
+                            sqlite3_bind_blob(sqliteStatements.insert_stmt.get(), 6, compressed_blob.data(), epub.size(), SQLITE_TRANSIENT);
 
-                            int rc = sqlite3_step(insert_book_statement.get());
+                            int rc = sqlite3_step(sqliteStatements.insert_stmt.get());
                             if (rc != SQLITE_DONE) {
                                 std::cerr << "Insert failed :::> " << sqlite3_errmsg(db) << std::endl;
                             }
 
-                            std::cout << "Return Code: " << rc << std::endl;
-                            sqlite3_reset(insert_book_statement.get());
-                            sqlite3_clear_bindings(insert_book_statement.get());
+                            sqlite3_reset(sqliteStatements.insert_stmt.get());
+                            sqlite3_clear_bindings(sqliteStatements.insert_stmt.get());
 
                             selected_path.clear();
                             epub.clear();
                             
                             memset(file_name, ' ', BUFFER_SIZE);
-                            file_name[BUFFER_SIZE - 1] = '\0';
+                            file_name[0] = '\0';
 
                             memset(author_name, ' ', BUFFER_SIZE);
-                            author_name[BUFFER_SIZE - 1] = '\0';
+                            author_name[0] = '\0';
 
                             memset(file_size, ' ', BUFFER_SIZE);
-                            file_size[BUFFER_SIZE - 1] = '\0';
+                            file_size[0] = '\0';
 
                             memset(extension, ' ', BUFFER_SIZE);
-                            extension[BUFFER_SIZE - 1] = '\0';
+                            extension[0] = '\0';
                             
                             memset(date_time, ' ', BUFFER_SIZE);
-                            date_time[BUFFER_SIZE - 1] = '\0';
+                            date_time[0] = '\0';
+            
                             
-                            
-                            RefreshBookList(books, names, fetch_books_statement);
+                            RefreshBookList(books, names, sqliteStatements.fetch_stmt);
                             
                             file_size_int = 0;
                             NEWBOOK_WINDOW.is_active = false;

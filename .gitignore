@@ -3,3 +3,4 @@ info/
 TODO.md
 src/iter2.txt
 .gitignore
+db/
