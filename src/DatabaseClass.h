@@ -2,6 +2,8 @@
 #define DATABASECLASS_H
 
 #include <sqlite3.h>
+
+#include "SQLiteAssets.h"
 #include "BookClasses.h"
 
 class Database {
@@ -50,6 +52,18 @@ class Database {
             return;
             
         };
+
+        void ShrinkDatabaseFile(statement& vacuum_stmt) {
+
+            if (sqlite3_step(vacuum_stmt.get()) != SQLITE_DONE) {
+                std::cerr << "Error shrinking database file." << std::endl;
+            }
+
+            sqlite3_reset(vacuum_stmt.get());
+
+            return;
+
+        }
 
         ~Database() {};
 

@@ -138,7 +138,7 @@ bool ListBoxWrapper(const char* label, int* current_item, std::vector<std::strin
 
 }
 
-void ImGuiMainBookDisplayLayout(Book_Collection& Collection, precompiled_sqliteStatements& statements) {
+void ImGuiMainBookDisplayLayout(Database& sqlite_db, Book_Collection& Collection, precompiled_sqliteStatements& statements) {
 
     ImGui::SetCursorPos(ImVec2(168.5,10));
     ImGui::Text("Books");
@@ -153,10 +153,10 @@ void ImGuiMainBookDisplayLayout(Book_Collection& Collection, precompiled_sqliteS
 
     ImGui::SetCursorPos(ImVec2(230, 170));
     if ( (ImGui::Button("Delete", ImVec2(56, 19))) && (!Collection.is_empty()) ) {
-        
+    
         DeleteEpubById(statements.delete_stmt, Collection.Display_Book.getid());
         Collection.RefreshBooks();
-        
+
     }
 
     ImGui::SetCursorPos(ImVec2(154,170));

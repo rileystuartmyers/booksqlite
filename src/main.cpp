@@ -11,11 +11,11 @@
 #include <nfd.h>
 
 #include "SQLiteAssets.h"
-#include "ImGuiAssets.h"
-#include "GLFWAssets.h"
-
 #include "BookClasses.h"
 #include "DatabaseClass.h"
+#include "GLFWAssets.h"
+#include "ImGuiAssets.h"
+
 
 void InitialSetup(GLFWwindow*& GLFWWINDOW, WINDOW window, const char* window_name) {
 
@@ -34,7 +34,7 @@ int main(int argc, char **argv) {
         USER_WINDOW, 
         "BookDB"
     );
-    
+        
     Database sqlite_db("BOOKS", "../db/books.db");
     precompiled_sqliteStatements sqliteStatements(sqlite_db.connection);
     Book_Collection Collection(sqlite_db.connection);
@@ -61,7 +61,7 @@ int main(int argc, char **argv) {
                 ImGui::BeginChild(5, ImVec2(372,230), true);
                 {
 
-                    ImGuiMainBookDisplayLayout(Collection, sqliteStatements);
+                    ImGuiMainBookDisplayLayout(sqlite_db, Collection, sqliteStatements);
 
                     
                     ImGui::SetCursorPos(ImVec2(154,200));
@@ -139,6 +139,7 @@ int main(int argc, char **argv) {
 
     }
 
+    sqlite_db.ShrinkDatabaseFile(sqliteStatements.vacuum_stmt);
     ImGuiCleanupProcess();
 
     return 0;

@@ -10,6 +10,7 @@
 
 #include "FileManip.h"
 
+
 const unsigned char* InsertWithNullCheck(const unsigned char* str) {
     return str ? str : reinterpret_cast<const unsigned char*>("");
 }
@@ -47,7 +48,8 @@ struct precompiled_sqliteStatements {
     statement insert_stmt;
     statement delete_stmt;
     statement download_stmt;
-    
+    statement vacuum_stmt;
+
     precompiled_sqliteStatements(sqlite3* db_ptr) :
     
         db(db_ptr),
@@ -78,13 +80,32 @@ struct precompiled_sqliteStatements {
                 db,
                 "SELECT title, file_type, binary FROM BOOKS WHERE id = ?"
             )
+        ),
+
+        vacuum_stmt(
+            create_statement(
+                db,
+                "VACUUM;"
+            )
         )
         
     {}
         
     ~precompiled_sqliteStatements() = default;
-        
+    
 };
+
+void ShrinkDatabaseFile(statement& stmt) {
+
+    if (sqlite3_step(stmt.get()) != SQLITE_DONE) {
+        std::cerr << "Error shrinking database file." << std::endl;
+    }
+
+    sqlite3_reset(stmt.get());
+
+    return;
+
+}
 
 void DeleteEpubById(statement& stmt, int id) {
 
@@ -135,6 +156,7 @@ void DownloadEpubById(statement& stmt, int id) {
     return;
 
 }
+
 
 void sqlite3Setup() {
 
