@@ -6,7 +6,7 @@
 #include <memory>
 #include <cstring>
 
-#include "SQLiteClasses.h"
+#include "SQLiteAssets.h"
 
 const int BUFFER_SIZE = 128;
 
@@ -141,19 +141,19 @@ class Book_Collection {
 
             while (sqlite3_step(fetch_stmt.get()) == SQLITE_ROW) {
 
+                const unsigned char* title = sqlite3_column_text(fetch_stmt.get(), 1);
+                
                 Book New_Book(
                     sqlite3_column_int(fetch_stmt.get(), 0),
-                    InsertWithNullCheck(sqlite3_column_text(fetch_stmt.get(), 1)),
+                    InsertWithNullCheck(title),
                     InsertWithNullCheck(sqlite3_column_text(fetch_stmt.get(), 2)),
                     InsertWithNullCheck(sqlite3_column_text(fetch_stmt.get(), 3)),
                     sqlite3_column_int64(fetch_stmt.get(), 4),
                     InsertWithNullCheck(sqlite3_column_text(fetch_stmt.get(), 5))
                 );
+
                 Books.push_back(New_Book);
-                
-                Book_Names.emplace_back(
-                    reinterpret_cast<const char *>(InsertWithNullCheck(sqlite3_column_text(fetch_stmt.get(), 1)))
-                );
+                Book_Names.emplace_back(reinterpret_cast<const char *>(InsertWithNullCheck(title)));
                 
                 size++;
 
@@ -172,7 +172,9 @@ class Book_Collection {
                 )
             )
 
-        {};
+        {
+            RefreshBooks();
+        };
 
         ~Book_Collection() {};
 

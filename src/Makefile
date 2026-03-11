@@ -2,14 +2,20 @@ EXE = main
 IMGUI_DIR = ../include/imgui
 NFD_DIR = ../include/nativefiledialog/src
 INCLUDE_DIR = ../include
+BUILD_DIR = ../build
+
+VPATH = . $(IMGUI_DIR) $(IMGUI_DIR)/backends $(NFD_DIR) $(INCLUDE_DIR)
 
 SOURCES = main.cpp
+SOURCES += ${INCLUDE_DIR}/sqlite3.c
+SOURCES += $(NFD_DIR)/nfd_common.c $(NFD_DIR)/nfd_gtk.c
 SOURCES += $(IMGUI_DIR)/imgui.cpp $(IMGUI_DIR)/imgui_draw.cpp $(IMGUI_DIR)/imgui_tables.cpp $(IMGUI_DIR)/imgui_widgets.cpp
-SOURCES += $(IMGUI_DIR)/backends/imgui_impl_glfw.cpp $(IMGUI_DIR)/backends/imgui_impl_opengl3.cpp $(NFD_DIR)/nfd_common.c $(NFD_DIR)/nfd_gtk.c
+SOURCES += $(IMGUI_DIR)/backends/imgui_impl_glfw.cpp $(IMGUI_DIR)/backends/imgui_impl_opengl3.cpp
 
 OBJS = $(SOURCES:.cpp=.o)
 OBJS := $(OBJS:.c=.o)
-OBJS += ${INCLUDE_DIR}/sqlite3.o
+OBJS := $(addprefix $(BUILD_DIR)/,$(notdir $(OBJS)))
+OBJS += ${BUILD_DIR}/sqlite3.o
 
 UNAME_S := $(shell uname -s)
 LINUX_GL_LIBS = -lGL
@@ -66,17 +72,13 @@ endif
 
 CC = gcc
 
-%.o:%.c
-	$(CC) $(CXXFLAGS) -c -o $@ $<
+$(BUILD_DIR)/%.o: %.cpp
+	@mkdir -p $(BUILD_DIR)
+	$(CXX) $(CXXFLAGS) -c $< -o $@
 
-%.o:%.cpp
-	$(CXX) $(CXXFLAGS) -c -o $@ $<
-
-%.o:$(IMGUI_DIR)/%.cpp
-	$(CXX) $(CXXFLAGS) -c -o $@ $<
-
-%.o:$(IMGUI_DIR)/backends/%.cpp
-	$(CXX) $(CXXFLAGS) -c -o $@ $<
+$(BUILD_DIR)/%.o: %.c
+	@mkdir -p $(BUILD_DIR)
+	$(CC) $(CFLAGS) -c $< -o $@
 
 all: $(EXE)
 	@echo Build complete for $(ECHO_MESSAGE)

@@ -31,6 +31,26 @@ class Database {
 
         };
 
+        void Populate_Buffer(std::string Path) {
+
+            Book_Buffer.Selected_Path = Path;
+
+            std::filesystem::path ParsedPath(Path);
+            strcpy(Book_Buffer.file_name, ParsedPath.stem().string().c_str());
+            strcpy(Book_Buffer.extension, ParsedPath.extension().string().c_str());
+            
+            Book_Buffer.file_size_int = std::filesystem::file_size(ParsedPath);
+            std::string file_size_str = std::to_string(Book_Buffer.file_size_int);
+            strcpy(Book_Buffer.file_size, file_size_str.c_str());
+            strcat(Book_Buffer.file_size, " B");
+            
+            time_t now = time(0);
+            strftime(Book_Buffer.date_time, sizeof(Book_Buffer.date_time), "%m/%d/%Y", localtime(&now));
+
+            return;
+            
+        };
+
         ~Database() {};
 
 };
