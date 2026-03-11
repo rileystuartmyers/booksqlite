@@ -27,9 +27,7 @@ This project requires the following libraries:
 * zlib
 * Native File Dialog (NFD)
 
-Build and Compile (preferrably using Makefile).
-
-Example:
+Build and Compile (preferrably using Makefile) by navigating into /src and using the command...
 
 ```
 make
