@@ -27,7 +27,7 @@ This project requires the following libraries:
 * zlib
 * Native File Dialog (NFD)
 
-Compile the project using your preferred build system (Makefile recommended).
+Build and Compile (preferrably using Makefile).
 
 Example:
 
@@ -41,26 +41,38 @@ make
 ## Project Structure
 
 ```
+
+/include
+      /imgui
+      /nativefiledialog
+      debug_printing_funcs.h
+      sqlite3.c
+      sqlite3.h
+      sqlite3ext.h
+
+/sqlcli
+      sql_cli.cpp (tool used to edit sqlite database in terminal)
+
 /src
       main.cpp
-      DatabaseClass.h
       BookClasses.h
-      SQLiteAssets.h
+      DatabaseClass.h
+      FileManip.h
       GLFWAssets.h
       ImGuiAssets.h
+      SQLiteAssets.h
 
 /db
       books.db
+
 ```
 
 ---
 
-### SQLite Download Guide ###
+### SQLite Download ###
 _(https://sqlite.org/download.html)_
 * Download the amalgamation package here
 
 ---
 
-## License
-
-This project is open source.
+## This project is open source.
