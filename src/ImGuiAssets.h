@@ -9,6 +9,8 @@
 #include "DatabaseClass.h"
 #include "GLFWAssets.h"
 
+GLuint coverTexture;
+
 void ImGuiNewBookWindowLayout(NewBook_Buffer& Book_Buffer) {
 
     ImGui::SetCursorPos(ImVec2(5,25));
@@ -108,16 +110,6 @@ void ImGuiDisplayBookInfoSectionLayout(Book_Collection& Collection) {
     ImGui::EndChild();
 }
 
-void ImGuiDisplayBookCoverImageLayout() {
-
-    ImGui::SetCursorPos(ImVec2(21,281));
-    ImGui::BeginChild(20, ImVec2(171,-16), true);
-    {
-        // logic for inserting the epub cover image
-    }
-    ImGui::EndChild();
-
-}
 
 bool ListBoxWrapper(const char* label, int* current_item, std::vector<std::string>& values) {
 
@@ -168,6 +160,7 @@ void ImGuiMainBookDisplayLayout(Database& sqlite_db, Book_Collection& Collection
     
 }
 
+
 void ImGuiNewBookWindowAddBookButtonLayout(Book_Collection& Collection, Database& db, precompiled_sqliteStatements& statements, WINDOW& window) {
 
     ImGui::SetCursorPos(ImVec2(290, 199));
@@ -190,6 +183,8 @@ void ImGuiNewBookWindowAddBookButtonLayout(Book_Collection& Collection, Database
         sqlite3_reset(statements.insert_stmt.get());
         sqlite3_clear_bindings(statements.insert_stmt.get());
         
+        coverTexture = CreateTextureFromRGBA(db.Book_Buffer.cover_data.pixels, db.Book_Buffer.cover_data.pixmap_width, db.Book_Buffer.cover_data.pixmap_height);
+
         db.Book_Buffer.Clear();
         Collection.RefreshBooks();
 
@@ -199,6 +194,26 @@ void ImGuiNewBookWindowAddBookButtonLayout(Book_Collection& Collection, Database
 
 }
 
+void ImGuiDisplayBookCoverImageLayout(NewBook_Buffer& Book_Buffer) {
+
+    ImGui::SetCursorPos(ImVec2(21,281));
+    ImGui::BeginChild(20, ImVec2(171,-16), true);
+    {
+        ImGui::Image(
+
+            (void*)(intptr_t)coverTexture, 
+
+            ImVec2(
+                (float)Book_Buffer.cover_data.pixmap_width,
+                (float)Book_Buffer.cover_data.pixmap_height
+            )
+
+        );
+
+    }
+    ImGui::EndChild();
+
+}
 void ImGuiNewFrameSetup() {
 
     ImGui_ImplOpenGL3_NewFrame();

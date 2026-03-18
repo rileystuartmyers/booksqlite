@@ -3,8 +3,12 @@
 
 #include <sqlite3.h>
 
+#include "mupdf/fitz.h"
+
+#include "FileManip.h"
 #include "SQLiteAssets.h"
 #include "BookClasses.h"
+
 
 class Database {
     
@@ -17,11 +21,19 @@ class Database {
 
         sqlite3* connection = nullptr;
         NewBook_Buffer Book_Buffer;
+        fz_context* mupdf_context;
 
         Database(const char* _Table_Name, const char* _Table_Path) {
 
             Table_Name = _Table_Name;
             Table_Path = _Table_Path;
+
+            mupdf_context = fz_new_context(nullptr, nullptr, FZ_STORE_DEFAULT);
+            if (!mupdf_context) {
+                throw std::runtime_error("Failed to create MuPDF context. Exiting...");
+            } else {
+                fz_register_document_handlers(mupdf_context);
+            }
 
             int rc = sqlite3_open(
                 Table_Path,
@@ -49,6 +61,8 @@ class Database {
             time_t now = time(0);
             strftime(Book_Buffer.date_time, sizeof(Book_Buffer.date_time), "%m/%d/%Y", localtime(&now));
 
+            Book_Buffer.cover_data = ExtractCover(mupdf_context, Path);
+
             return;
             
         };
@@ -65,7 +79,14 @@ class Database {
 
         }
 
-        ~Database() {};
+        ~Database() {
+
+            if (mupdf_context) {
+                fz_drop_context(mupdf_context);
+                mupdf_context = nullptr;
+            }
+
+        }
 
 };
 

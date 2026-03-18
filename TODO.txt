@@ -1,0 +1,3 @@
+#TODO
+
+* Update SQLiteAssets.h and update SQL queries to include book cover row.

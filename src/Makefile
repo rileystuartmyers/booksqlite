@@ -1,6 +1,7 @@
 EXE = main
 IMGUI_DIR = ../include/imgui
 NFD_DIR = ../include/nativefiledialog/src
+MUPDF_DIR = ../include/mupdf
 INCLUDE_DIR = ../include
 BUILD_DIR = ../build
 
@@ -22,7 +23,12 @@ LINUX_GL_LIBS = -lGL
 
 
 CXXFLAGS = -std=c++17 -lstdc++fs -I$(IMGUI_DIR) -I$(IMGUI_DIR)/backends -I$(NFD_DIR) -Wall
+CXXFLAGS += -I$(MUPDF_DIR)/include
 CXXFLAGS += -g
+
+MUPDF_LIBS = $(MUPDF_DIR)/build/release/libmupdf.a \
+             $(MUPDF_DIR)/build/release/libmupdf-third.a
+
 LIBS =
 
 ##---------------------------------------------------------------------
@@ -84,7 +90,7 @@ all: $(EXE)
 	@echo Build complete for $(ECHO_MESSAGE)
 
 $(EXE): $(OBJS)
-	$(CXX) -o $@ $^ $(CXXFLAGS) $(LIBS)
+	$(CXX) -o $@ $^ $(MUPDF_LIBS) $(CXXFLAGS) $(LIBS)
 
 clean:
 	rm -f $(EXE) $(OBJS)

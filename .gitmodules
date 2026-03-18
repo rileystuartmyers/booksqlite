@@ -4,3 +4,9 @@
 [submodule "include/nativefiledialog"]
 	path = include/nativefiledialog
 	url = https://github.com/mlabbe/nativefiledialog.git
+[submodule "include/mupdf_wrapper"]
+	path = include/mupdf_wrapper
+	url = https://github.com/antonioborondo/mupdf_wrapper.git
+[submodule "include/mupdf"]
+	path = include/mupdf
+	url = https://github.com/ArtifexSoftware/mupdf.git

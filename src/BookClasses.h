@@ -14,13 +14,13 @@ struct NewBook_Buffer {
 
     std::vector<unsigned char> blob_data;   
     std::string Selected_Path;
-
     char file_name[BUFFER_SIZE];
     char author_name[BUFFER_SIZE];
     char extension[BUFFER_SIZE];
     char file_size[BUFFER_SIZE];
     int file_size_int;
     char date_time[BUFFER_SIZE];
+    CoverImage cover_data;
 
     NewBook_Buffer() :
         Selected_Path(""),
@@ -55,6 +55,10 @@ struct NewBook_Buffer {
         date_time[0] = '\0';
 
         file_size_int = 0;
+
+        cover_data.pixels.clear();
+        cover_data.pixmap_height = 0;
+        cover_data.pixmap_width = 0;
         
     }
 
@@ -70,6 +74,7 @@ class Book {
         std::string file_type;
         long int file_size;
         std::string date_modified;
+        CoverImage cover_data;
 
     public:
 
@@ -91,7 +96,7 @@ class Book {
             author(""), 
             file_type(""), 
             file_size(0), 
-            date_modified("") 
+            date_modified("")
             
         {};
 
@@ -103,6 +108,10 @@ class Book {
         const char *gettype() { return file_type.c_str(); }
         long int getsize() const { return file_size; }
         const char *getdate() { return date_modified.c_str(); }
+        std::vector<unsigned char> getcover() { return cover_data.pixels; }
+        int getcoverwidth() { return cover_data.pixmap_width; }
+        int getcoverheight() { return cover_data.pixmap_height; }
+
 
         void ClearBook() {
             id = 0;
@@ -111,6 +120,9 @@ class Book {
             file_type = "";
             file_size = 0;
             date_modified = "";
+            cover_data.pixels.clear();
+            cover_data.pixmap_height = 0;
+            cover_data.pixmap_width = 0;
         }
 
 };

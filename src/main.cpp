@@ -10,10 +10,10 @@
 #include <zlib.h>
 #include <nfd.h>
 
+#include "GLFWAssets.h"
 #include "SQLiteAssets.h"
 #include "BookClasses.h"
 #include "DatabaseClass.h"
-#include "GLFWAssets.h"
 #include "ImGuiAssets.h"
 
 
@@ -28,7 +28,7 @@ void InitialSetup(GLFWwindow*& GLFWWINDOW, WINDOW window, const char* window_nam
 }
 
 int main(int argc, char **argv) {
-    
+        
     InitialSetup(
         GLFW_WINDOW, 
         USER_WINDOW, 
@@ -68,6 +68,7 @@ int main(int argc, char **argv) {
                     if (ImGui::Button("New Book", ImVec2(64,19))) {
 
                         nfdchar_t *path = nullptr;
+                        CoverImage BookCover;
                         nfdresult_t result = NFD_OpenDialog(NULL, NULL, &path);
 
                         if (result == NFD_OKAY) {
@@ -80,7 +81,7 @@ int main(int argc, char **argv) {
                                 std::cerr << "File is empty..." << std::endl;
                             
                             } else {
-                                
+
                                 sqlite_db.Populate_Buffer(path);
                                 NEWBOOK_WINDOW.Activate();
 
@@ -106,7 +107,7 @@ int main(int argc, char **argv) {
 
                 ImGuiDisplayBookInfoSectionLayout(Collection);
                 
-                ImGuiDisplayBookCoverImageLayout();
+                ImGuiDisplayBookCoverImageLayout(sqlite_db.Book_Buffer);
 
 
                 if (NEWBOOK_WINDOW.Is_Active()) {
