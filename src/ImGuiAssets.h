@@ -10,6 +10,7 @@
 #include "GLFWAssets.h"
 
 GLuint coverTexture;
+GLuint blankTexture = 0;
 
 void ImGuiNewBookWindowLayout(NewBook_Buffer& Book_Buffer) {
 
@@ -82,7 +83,7 @@ void ImGuiDisplayBookInfoSectionLayout(Book_Collection& Collection) {
         ImGui::SetCursorPos(ImVec2(8,110));
         ImGui::Text("Date Added:");
         
-        if (!Collection.is_empty()) {
+        if (!Collection.empty()) {
 
             // Title Box
             ImGui::SetCursorPos(ImVec2(53,30));
@@ -144,7 +145,7 @@ void ImGuiMainBookDisplayLayout(Database& sqlite_db, Book_Collection& Collection
     }
 
     ImGui::SetCursorPos(ImVec2(230, 170));
-    if ( (ImGui::Button("Delete", ImVec2(56, 19))) && (!Collection.is_empty()) ) {
+    if ( (ImGui::Button("Delete", ImVec2(56, 19))) && (!Collection.empty()) ) {
     
         DeleteEpubById(statements.delete_stmt, Collection.Display_Book.getid());
         Collection.RefreshBooks();
@@ -152,7 +153,7 @@ void ImGuiMainBookDisplayLayout(Database& sqlite_db, Book_Collection& Collection
     }
 
     ImGui::SetCursorPos(ImVec2(154,170));
-    if ( (ImGui::Button("Download", ImVec2(64,19))) && (!Collection.is_empty()) ){
+    if ( (ImGui::Button("Download", ImVec2(64,19))) && (!Collection.empty()) ){
 
         DownloadEpubById(statements.download_stmt, Collection.Display_Book.getid());
         
@@ -174,6 +175,7 @@ void ImGuiNewBookWindowAddBookButtonLayout(Book_Collection& Collection, Database
         sqlite3_bind_int64(statements.insert_stmt.get(), 4, db.Book_Buffer.file_size_int);
         sqlite3_bind_text(statements.insert_stmt.get(), 5, db.Book_Buffer.date_time, -1, SQLITE_TRANSIENT);
         sqlite3_bind_blob(statements.insert_stmt.get(), 6, compressed_blob.data(), db.Book_Buffer.blob_data.size(), SQLITE_TRANSIENT);
+        sqlite3_bind_blob(statements.insert_stmt.get(), 7, db.Book_Buffer.cover_data.data(), db.Book_Buffer.cover_data.size(), SQLITE_TRANSIENT);
 
         int rc = sqlite3_step(statements.insert_stmt.get());
         if (rc != SQLITE_DONE) {
@@ -183,10 +185,11 @@ void ImGuiNewBookWindowAddBookButtonLayout(Book_Collection& Collection, Database
         sqlite3_reset(statements.insert_stmt.get());
         sqlite3_clear_bindings(statements.insert_stmt.get());
         
-        coverTexture = CreateTextureFromRGBA(db.Book_Buffer.cover_data.pixels, db.Book_Buffer.cover_data.pixmap_width, db.Book_Buffer.cover_data.pixmap_height);
+        coverTexture = CreateTextureFromRGBA(db.Book_Buffer.cover_data);
 
         db.Book_Buffer.Clear();
         Collection.RefreshBooks();
+        Collection.SetDisplayBookToLastIndex();
 
         window.IS_ACTIVE = false;
         
@@ -194,7 +197,14 @@ void ImGuiNewBookWindowAddBookButtonLayout(Book_Collection& Collection, Database
 
 }
 
-void ImGuiDisplayBookCoverImageLayout(NewBook_Buffer& Book_Buffer) {
+void ImGuiDisplayBookCoverImageLayout(std::vector<unsigned char>& cover_data) {
+
+    if (cover_data.empty()) {
+        coverTexture = blankTexture;
+    } else {
+        coverTexture = CreateTextureFromRGBA(cover_data);
+    }
+
 
     ImGui::SetCursorPos(ImVec2(21,281));
     ImGui::BeginChild(20, ImVec2(171,-16), true);
@@ -204,8 +214,8 @@ void ImGuiDisplayBookCoverImageLayout(NewBook_Buffer& Book_Buffer) {
             (void*)(intptr_t)coverTexture, 
 
             ImVec2(
-                (float)Book_Buffer.cover_data.pixmap_width,
-                (float)Book_Buffer.cover_data.pixmap_height
+                (float)COVER_PIXEL_WIDTH,
+                (float)COVER_PIXEL_HEIGHT
             )
 
         );
@@ -230,7 +240,30 @@ void ImGuiCleanupProcess() {
     
 }
 
+void BlankTextureSetup(GLuint& blank) {
+
+    if (blank == 0) {
+
+        std::vector<unsigned char> pixels(COVER_PIXEL_WIDTH * COVER_PIXEL_HEIGHT * 4);
+        
+        for (int i = 0; i < COVER_PIXEL_WIDTH * COVER_PIXEL_HEIGHT; ++i) {
+            pixels[i * 4 + 0] = 200;
+            pixels[i * 4 + 1] = 200;
+            pixels[i * 4 + 2] = 200;
+            pixels[i * 4 + 3] = 255;
+        }
+        
+        blankTexture = CreateTextureFromRGBA(pixels);
+        
+    }
+
+    return;
+
+}
+
 void ImGuiSetup(GLFWwindow* GLFWWINDOW) {
+
+    BlankTextureSetup(blankTexture);
 
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO();

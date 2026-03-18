@@ -20,7 +20,7 @@ struct NewBook_Buffer {
     char file_size[BUFFER_SIZE];
     int file_size_int;
     char date_time[BUFFER_SIZE];
-    CoverImage cover_data;
+    std::vector<unsigned char> cover_data;
 
     NewBook_Buffer() :
         Selected_Path(""),
@@ -56,9 +56,7 @@ struct NewBook_Buffer {
 
         file_size_int = 0;
 
-        cover_data.pixels.clear();
-        cover_data.pixmap_height = 0;
-        cover_data.pixmap_width = 0;
+        cover_data.clear();
         
     }
 
@@ -74,11 +72,11 @@ class Book {
         std::string file_type;
         long int file_size;
         std::string date_modified;
-        CoverImage cover_data;
-
+        
     public:
-
-        Book(int _id, const unsigned char *_title, const unsigned char *_author, const unsigned char *_file_type, long int _file_size, const unsigned char *_date_modified) {
+        
+        std::vector<unsigned char> cover_data;
+        Book(int _id, const unsigned char *_title, const unsigned char *_author, const unsigned char *_file_type, long int _file_size, const unsigned char *_date_modified, std::vector<unsigned char> _cover_data) {
 
             id = _id;
             title = _title ? reinterpret_cast<const char *>(_title) : "";
@@ -86,6 +84,7 @@ class Book {
             file_type = _file_type ? reinterpret_cast<const char *>(_file_type) : "";
             file_size = _file_size;
             date_modified = _date_modified ? reinterpret_cast<const char *>(_date_modified) : "";
+            cover_data = _cover_data;
 
         }
 
@@ -108,10 +107,6 @@ class Book {
         const char *gettype() { return file_type.c_str(); }
         long int getsize() const { return file_size; }
         const char *getdate() { return date_modified.c_str(); }
-        std::vector<unsigned char> getcover() { return cover_data.pixels; }
-        int getcoverwidth() { return cover_data.pixmap_width; }
-        int getcoverheight() { return cover_data.pixmap_height; }
-
 
         void ClearBook() {
             id = 0;
@@ -120,9 +115,7 @@ class Book {
             file_type = "";
             file_size = 0;
             date_modified = "";
-            cover_data.pixels.clear();
-            cover_data.pixmap_height = 0;
-            cover_data.pixmap_width = 0;
+            cover_data.clear();
         }
 
 };
@@ -154,14 +147,19 @@ class Book_Collection {
             while (sqlite3_step(fetch_stmt.get()) == SQLITE_ROW) {
 
                 const unsigned char* title = sqlite3_column_text(fetch_stmt.get(), 1);
-                
+                std::vector<unsigned char> cover_data = ReadVoidBlobIntoUnsignedCharVector(
+                    (void*)sqlite3_column_blob(fetch_stmt.get(), 6),
+                    (int)sqlite3_column_bytes(fetch_stmt.get(), 6)
+                );
+
                 Book New_Book(
                     sqlite3_column_int(fetch_stmt.get(), 0),
                     InsertWithNullCheck(title),
                     InsertWithNullCheck(sqlite3_column_text(fetch_stmt.get(), 2)),
                     InsertWithNullCheck(sqlite3_column_text(fetch_stmt.get(), 3)),
                     sqlite3_column_int64(fetch_stmt.get(), 4),
-                    InsertWithNullCheck(sqlite3_column_text(fetch_stmt.get(), 5))
+                    InsertWithNullCheck(sqlite3_column_text(fetch_stmt.get(), 5)),
+                    cover_data
                 );
 
                 Books.push_back(New_Book);
@@ -180,7 +178,7 @@ class Book_Collection {
             fetch_stmt(
                 create_statement(
                     db_ptr,
-                    "SELECT id, title, author, file_type, file_size, date_modified FROM BOOKS WHERE title IS NOT NULL;"
+                    "SELECT id, title, author, file_type, file_size, date_modified, cover FROM BOOKS WHERE title IS NOT NULL;"
                 )
             )
 
@@ -203,19 +201,21 @@ class Book_Collection {
             Display_Book = Books[index];
         }
 
-        bool is_empty() {
+        void SetDisplayBookToLastIndex() {
+            CURRENT_INDEX = std::max(0, size - 1);
+            Display_Book = Books[CURRENT_INDEX];
+        }
 
-            if (size == 0) {
-                
-                return true;
+        void SetIndex(int index) {
+            CURRENT_INDEX = index;
+        }
+        int count() {
+            return size;
+        }
 
-            } else {
-
-                return false;
-
-            }
-
-        };
+        bool empty() {
+            return Books.empty();
+        }
 
 };
 
@@ -230,14 +230,20 @@ void RefreshBookList(std::vector<Book> &books, std::vector<std::string> &names, 
         names.emplace_back(
             reinterpret_cast<const char *>(InsertWithNullCheck(sqlite3_column_text(stmt.get(), 1)))
         );
-        
+
+        std::vector<unsigned char> cover_data = ReadVoidBlobIntoUnsignedCharVector(
+            (void*)sqlite3_column_blob(stmt.get(), 6),
+            (int)sqlite3_column_bytes(stmt.get(), 6)
+        );        
+
         Book new_book(
             sqlite3_column_int(stmt.get(), 0),
             InsertWithNullCheck(sqlite3_column_text(stmt.get(), 1)),
             InsertWithNullCheck(sqlite3_column_text(stmt.get(), 2)),
             InsertWithNullCheck(sqlite3_column_text(stmt.get(), 3)),
             sqlite3_column_int64(stmt.get(), 4),
-            InsertWithNullCheck(sqlite3_column_text(stmt.get(), 5))
+            InsertWithNullCheck(sqlite3_column_text(stmt.get(), 5)),
+            cover_data
         );
 
         books.push_back(new_book);

@@ -57,14 +57,14 @@ struct precompiled_sqliteStatements {
         fetch_stmt(
             create_statement(
                 db,
-                "SELECT id, title, author, file_type, file_size, date_modified FROM BOOKS WHERE title IS NOT NULL;"
+                "SELECT id, title, author, file_type, file_size, date_modified, cover FROM BOOKS WHERE title IS NOT NULL;"
             )
         ),
 
         insert_stmt(
             create_statement(
                 db,
-                "INSERT INTO BOOKS(title, author, file_type, file_size, date_modified, binary) VALUES (?, ?, ?, ?, ?, ?);"
+                "INSERT INTO BOOKS(title, author, file_type, file_size, date_modified, binary, cover) VALUES (?, ?, ?, ?, ?, ?, ?);"
             )
         ),
         

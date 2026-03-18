@@ -29,6 +29,8 @@ void InitialSetup(GLFWwindow*& GLFWWINDOW, WINDOW window, const char* window_nam
 
 int main(int argc, char **argv) {
         
+    std::cout << "100" << std::endl;
+
     InitialSetup(
         GLFW_WINDOW, 
         USER_WINDOW, 
@@ -47,7 +49,7 @@ int main(int argc, char **argv) {
         ImGui::SetNextWindowSize(ImVec2(USER_WINDOW.X, USER_WINDOW.Y));
         ImGui::SetNextWindowPos(ImVec2(0, 0));
         
-        if (!Collection.is_empty()) {
+        if (!Collection.empty()) {
             Collection.SetDisplayBookToCurrentIndex();
         }
 
@@ -107,7 +109,7 @@ int main(int argc, char **argv) {
 
                 ImGuiDisplayBookInfoSectionLayout(Collection);
                 
-                ImGuiDisplayBookCoverImageLayout(sqlite_db.Book_Buffer);
+                ImGuiDisplayBookCoverImageLayout(Collection.Display_Book.cover_data);
 
 
                 if (NEWBOOK_WINDOW.Is_Active()) {

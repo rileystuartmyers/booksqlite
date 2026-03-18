@@ -1,3 +1,17 @@
 #TODO
 
-* Update SQLiteAssets.h and update SQL queries to include book cover row.
+* Add texture caching for current book cover
+
+
+Schema:
+
+CREATE TABLE BOOKS (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT,
+    author TEXT,
+    file_type TEXT,
+    file_size TEXT,
+    date_modified DATETIME,
+    binary BLOB,
+    cover BLOB
+);

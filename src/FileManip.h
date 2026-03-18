@@ -10,15 +10,22 @@
 #include "GLFWAssets.h"
 #include "mupdf/fitz.h"
 
-const int COVER_PIXEL_WIDTH = 80;
-const int COVER_PIXEL_HEIGHT = 100;
-const float COVER_SCALE = 0.25f;
+const int COVER_PIXEL_WIDTH = 110;
+const int COVER_PIXEL_HEIGHT = 160;
 
 struct CoverImage {
 
     std::vector<unsigned char> pixels;
     int pixmap_width = 0;
     int pixmap_height = 0;
+
+    void Clear() {
+
+        pixels.clear();
+        pixmap_width = 0;
+        pixmap_height = 0;
+
+    }
 
 };
 
@@ -92,19 +99,21 @@ std::vector<unsigned char> readFile(std::string& path) {
     
 }
 
-CoverImage ExtractCover(fz_context* context, const std::string& path) {
+std::vector<unsigned char> ExtractCover(fz_context* context, const std::string& path) {
 
     fz_document* docu = fz_open_document(context, path.c_str());
     if (!docu) {
         throw std::runtime_error("Failed to open file: " + path + "\n");
     }
 
-    CoverImage NewCover;
-
     fz_page* page = fz_load_page(context, docu, 0);
     fz_rect bounds;
+
     bounds = fz_bound_page(context, page);
-    fz_matrix transform = fz_scale(COVER_SCALE, COVER_SCALE);
+    float scale_x = COVER_PIXEL_WIDTH / (bounds.x1 - bounds.x0);
+    float scale_y = COVER_PIXEL_HEIGHT / (bounds.y1 - bounds.y0);
+
+    fz_matrix transform = fz_scale(scale_x, scale_y);
     fz_rect transformed_bounds = fz_transform_rect(bounds, transform);
     fz_irect bbox = fz_round_rect(transformed_bounds);
 
@@ -115,21 +124,22 @@ CoverImage ExtractCover(fz_context* context, const std::string& path) {
     fz_run_page(context, page, dev, fz_identity, NULL);
     fz_drop_device(context, dev);
 
-    NewCover.pixmap_width = fz_pixmap_width(context, pix);
-    NewCover.pixmap_height = fz_pixmap_height(context, pix);
+    int pixmap_width = fz_pixmap_width(context, pix);
+    int pixmap_height = fz_pixmap_height(context, pix);
+    std::vector<unsigned char> pixels(pixmap_width * pixmap_height * 4);
+
     int stride = fz_pixmap_stride(context, pix);  
     int n = fz_pixmap_components(context, pix);
     
     unsigned char* rgb = fz_pixmap_samples(context, pix);
-    std::vector<unsigned char> pixels(NewCover.pixmap_width * NewCover.pixmap_height * 4);
-    for (int y = 0; y < NewCover.pixmap_height; ++y) {
-        for (int x = 0; x < NewCover.pixmap_width; ++x) {
+    for (int y = 0; y < pixmap_height; ++y) {
+        for (int x = 0; x < pixmap_width; ++x) {
             unsigned char r = rgb[y * stride + x * n + 0];
             unsigned char g = rgb[y * stride + x * n + 1];
             unsigned char b = rgb[y * stride + x * n + 2];
             unsigned char a = (n == 4) ? rgb[y * stride + x * n + 3] : 255;
 
-            int idx = (y * NewCover.pixmap_width + x) * 4;
+            int idx = (y * pixmap_width + x) * 4;
             pixels[idx + 0] = r;
             pixels[idx + 1] = g;
             pixels[idx + 2] = b;
@@ -137,17 +147,15 @@ CoverImage ExtractCover(fz_context* context, const std::string& path) {
         }
     }
 
-    NewCover.pixels = std::move(pixels);
-
     fz_drop_pixmap(context, pix);
     fz_drop_page(context, page);
     fz_drop_document(context, docu);
 
-    return NewCover;
+    return pixels;
     
 }
 
-GLuint CreateTextureFromRGBA(const std::vector<unsigned char>& pixels, int width, int height)
+GLuint CreateTextureFromRGBA(const std::vector<unsigned char>& pixels)
 {
     GLuint texID;
     glGenTextures(1, &texID);
@@ -156,7 +164,7 @@ GLuint CreateTextureFromRGBA(const std::vector<unsigned char>& pixels, int width
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0,
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, COVER_PIXEL_WIDTH, COVER_PIXEL_HEIGHT, 0,
                  GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
 
     glBindTexture(GL_TEXTURE_2D, 0);
