@@ -43,6 +43,7 @@ make
 /include
       /imgui
       /nativefiledialog
+      /mupdf
       debug_printing_funcs.h
       sqlite3.c
       sqlite3.h
