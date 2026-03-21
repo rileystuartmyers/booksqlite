@@ -8,6 +8,52 @@
 
 #include <imgui.h>
 
+const int COVER_PIXEL_WIDTH = 110;
+const int COVER_PIXEL_HEIGHT = 160;
+
+GLFWwindow* GLFW_WINDOW;
+GLuint BLANK_TEXTURE = 0;
+GLuint COVER_TEXTURE;
+
+GLuint CreateTextureFromRGBA(const std::vector<unsigned char>& pixels)
+{
+
+    GLuint texID;
+    glGenTextures(1, &texID);
+    glBindTexture(GL_TEXTURE_2D, texID);
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, COVER_PIXEL_WIDTH, COVER_PIXEL_HEIGHT, 0,
+                 GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
+
+    glBindTexture(GL_TEXTURE_2D, 0);
+    return texID;
+
+}
+
+void BLANK_TEXTURE_Setup(GLuint& blank) {
+
+    if (blank == 0) {
+
+        std::vector<unsigned char> pixels(COVER_PIXEL_WIDTH * COVER_PIXEL_HEIGHT * 4);
+        
+        for (int i = 0; i < COVER_PIXEL_WIDTH * COVER_PIXEL_HEIGHT; ++i) {
+            pixels[i * 4 + 0] = 200;
+            pixels[i * 4 + 1] = 200;
+            pixels[i * 4 + 2] = 200;
+            pixels[i * 4 + 3] = 255;
+        }
+        
+        BLANK_TEXTURE = CreateTextureFromRGBA(pixels);
+        
+    }
+
+    return;
+
+}
+
 struct WINDOW {
     
     int X;
@@ -60,7 +106,6 @@ WINDOW NEWBOOK_WINDOW(
     false
 );
 
-GLFWwindow* GLFW_WINDOW;
 
 void GLFWRenderFrameProcess(GLFWwindow* GLFWWINDOW, WINDOW& USERWINDOW) {
 
@@ -81,6 +126,8 @@ GLFWwindow* GLFWSetup(WINDOW window, const char* window_name) {
     if (GLFWWINDOW == nullptr) {
         throw std::runtime_error("Failed to initialize GLFWwindow. Exiting...");
     }
+
+    BLANK_TEXTURE_Setup(BLANK_TEXTURE);
 
     glfwSetWindowSizeLimits(GLFWWINDOW, USER_WINDOW.X, USER_WINDOW.Y, USER_WINDOW.X, USER_WINDOW.Y);
     glfwMakeContextCurrent(GLFWWINDOW);

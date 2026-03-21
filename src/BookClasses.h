@@ -76,6 +76,7 @@ class Book {
     public:
         
         std::vector<unsigned char> cover_data;
+
         Book(int _id, const unsigned char *_title, const unsigned char *_author, const unsigned char *_file_type, long int _file_size, const unsigned char *_date_modified, std::vector<unsigned char> _cover_data) {
 
             id = _id;
@@ -108,7 +109,7 @@ class Book {
         long int getsize() const { return file_size; }
         const char *getdate() { return date_modified.c_str(); }
 
-        void ClearBook() {
+        void Clear() {
             id = 0;
             title = "";
             author = "";
@@ -193,6 +194,7 @@ class Book_Collection {
             return Books[index];
         }
 
+        
         void SetDisplayBookToCurrentIndex() {
             Display_Book = Books[CURRENT_INDEX];
         }
@@ -200,15 +202,34 @@ class Book_Collection {
         void SetDisplayBookWithIndex(int index) {
             Display_Book = Books[index];
         }
-
+        
         void SetDisplayBookToLastIndex() {
             CURRENT_INDEX = std::max(0, size - 1);
             Display_Book = Books[CURRENT_INDEX];
         }
-
+        
         void SetIndex(int index) {
             CURRENT_INDEX = index;
         }
+        
+        int GetIdOfCurrentBook() {
+            return Books[CURRENT_INDEX].getid();
+        }
+        
+        int GetIdOfDisplayBook() {
+            return Display_Book.getid();
+        }
+        
+        void DeleteCurrentBook(precompiled_sqliteStatements& statements) {
+
+            DeleteEpubById(statements.delete_stmt, Display_Book.getid());
+
+            SetDefaultCoverTextureAfterDelete(COVER_TEXTURE);
+            Display_Book.Clear();
+            RefreshBooks();
+
+        }
+
         int count() {
             return size;
         }

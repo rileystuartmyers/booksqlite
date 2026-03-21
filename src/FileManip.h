@@ -10,9 +10,6 @@
 #include "GLFWAssets.h"
 #include "mupdf/fitz.h"
 
-const int COVER_PIXEL_WIDTH = 110;
-const int COVER_PIXEL_HEIGHT = 160;
-
 struct CoverImage {
 
     std::vector<unsigned char> pixels;
@@ -155,22 +152,11 @@ std::vector<unsigned char> ExtractCover(fz_context* context, const std::string& 
     
 }
 
-GLuint CreateTextureFromRGBA(const std::vector<unsigned char>& pixels)
-{
-    GLuint texID;
-    glGenTextures(1, &texID);
-    glBindTexture(GL_TEXTURE_2D, texID);
+void SetDefaultCoverTextureAfterDelete(GLuint& cover) {
 
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    cover = BLANK_TEXTURE;
+    return;
 
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, COVER_PIXEL_WIDTH, COVER_PIXEL_HEIGHT, 0,
-                 GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
-
-    glBindTexture(GL_TEXTURE_2D, 0);
-    return texID;
 }
-
-
 
 #endif

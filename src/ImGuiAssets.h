@@ -9,9 +9,6 @@
 #include "DatabaseClass.h"
 #include "GLFWAssets.h"
 
-GLuint coverTexture;
-GLuint blankTexture = 0;
-
 void ImGuiNewBookWindowLayout(NewBook_Buffer& Book_Buffer) {
 
     ImGui::SetCursorPos(ImVec2(5,25));
@@ -147,8 +144,7 @@ void ImGuiMainBookDisplayLayout(Database& sqlite_db, Book_Collection& Collection
     ImGui::SetCursorPos(ImVec2(230, 170));
     if ( (ImGui::Button("Delete", ImVec2(56, 19))) && (!Collection.empty()) ) {
     
-        DeleteEpubById(statements.delete_stmt, Collection.Display_Book.getid());
-        Collection.RefreshBooks();
+        Collection.DeleteCurrentBook(statements);
 
     }
 
@@ -185,7 +181,7 @@ void ImGuiNewBookWindowAddBookButtonLayout(Book_Collection& Collection, Database
         sqlite3_reset(statements.insert_stmt.get());
         sqlite3_clear_bindings(statements.insert_stmt.get());
         
-        coverTexture = CreateTextureFromRGBA(db.Book_Buffer.cover_data);
+        COVER_TEXTURE = CreateTextureFromRGBA(db.Book_Buffer.cover_data);
 
         db.Book_Buffer.Clear();
         Collection.RefreshBooks();
@@ -197,21 +193,20 @@ void ImGuiNewBookWindowAddBookButtonLayout(Book_Collection& Collection, Database
 
 }
 
-void ImGuiDisplayBookCoverImageLayout(std::vector<unsigned char>& cover_data) {
+void ImGuiDisplayBookCoverImageLayout(Book_Collection& Collection, std::vector<unsigned char>& cover_data) {
 
     if (cover_data.empty()) {
-        coverTexture = blankTexture;
-    } else {
-        coverTexture = CreateTextureFromRGBA(cover_data);
+        COVER_TEXTURE = BLANK_TEXTURE;
+    } else if (Collection.GetIdOfCurrentBook() != Collection.GetIdOfDisplayBook()) {
+        COVER_TEXTURE = CreateTextureFromRGBA(cover_data); // prevents retexturing of the same cover
     }
-
-
+    
     ImGui::SetCursorPos(ImVec2(21,281));
     ImGui::BeginChild(20, ImVec2(171,-16), true);
     {
         ImGui::Image(
 
-            (void*)(intptr_t)coverTexture, 
+            (void*)(intptr_t)COVER_TEXTURE, 
 
             ImVec2(
                 (float)COVER_PIXEL_WIDTH,
@@ -224,6 +219,7 @@ void ImGuiDisplayBookCoverImageLayout(std::vector<unsigned char>& cover_data) {
     ImGui::EndChild();
 
 }
+
 void ImGuiNewFrameSetup() {
 
     ImGui_ImplOpenGL3_NewFrame();
@@ -240,30 +236,7 @@ void ImGuiCleanupProcess() {
     
 }
 
-void BlankTextureSetup(GLuint& blank) {
-
-    if (blank == 0) {
-
-        std::vector<unsigned char> pixels(COVER_PIXEL_WIDTH * COVER_PIXEL_HEIGHT * 4);
-        
-        for (int i = 0; i < COVER_PIXEL_WIDTH * COVER_PIXEL_HEIGHT; ++i) {
-            pixels[i * 4 + 0] = 200;
-            pixels[i * 4 + 1] = 200;
-            pixels[i * 4 + 2] = 200;
-            pixels[i * 4 + 3] = 255;
-        }
-        
-        blankTexture = CreateTextureFromRGBA(pixels);
-        
-    }
-
-    return;
-
-}
-
 void ImGuiSetup(GLFWwindow* GLFWWINDOW) {
-
-    BlankTextureSetup(blankTexture);
 
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO();
@@ -278,5 +251,6 @@ void ImGuiSetup(GLFWwindow* GLFWWINDOW) {
     return;
 
 }
+
 
 #endif

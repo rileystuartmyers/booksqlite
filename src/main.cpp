@@ -29,8 +29,7 @@ void InitialSetup(GLFWwindow*& GLFWWINDOW, WINDOW window, const char* window_nam
 
 int main(int argc, char **argv) {
         
-    std::cout << "100" << std::endl;
-
+    std::cout << "44" << std::endl;
     InitialSetup(
         GLFW_WINDOW, 
         USER_WINDOW, 
@@ -106,10 +105,9 @@ int main(int argc, char **argv) {
                 }
                 ImGui::EndChild();
 
-
                 ImGuiDisplayBookInfoSectionLayout(Collection);
                 
-                ImGuiDisplayBookCoverImageLayout(Collection.Display_Book.cover_data);
+                ImGuiDisplayBookCoverImageLayout(Collection, Collection.Display_Book.cover_data);
 
 
                 if (NEWBOOK_WINDOW.Is_Active()) {
