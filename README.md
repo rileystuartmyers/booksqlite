@@ -6,6 +6,12 @@ The application is built in **C++** with **OpenGL + ImGui** for the user interfa
 
 ---
 
+## Preview
+
+![Alt text](ProgramImage.png)
+
+---
+
 ## Features
 
 * 📚 Import books directly from your filesystem
