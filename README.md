@@ -1,4 +1,4 @@
-# BookDB
+# booksqlite
 
 A lightweight desktop application for managing a personal collection of books. It provides a graphical interface for importing, storing, and browsing book files (such as EPUBs) using an SQLite database backend.
 
@@ -43,6 +43,7 @@ make
 /include
       /imgui
       /nativefiledialog
+      /mupdf
       debug_printing_funcs.h
       sqlite3.c
       sqlite3.h
